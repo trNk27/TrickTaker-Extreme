@@ -175,18 +175,25 @@ class WizardExtremeGame {
     _assignTrickResult(winnerIdx, winCard, leadColor) {
         const p = this.players[winnerIdx];
 
-        // 1. Try to remove seal of winning card color (standard rule)
-        if (p.seals[winCard.color] > 0) {
-            p.seals[winCard.color]--;
-            return 2.0;
-        }
-
-        // 2. Special Case: Winning with Red (Trump) checks lead color next
-        if (winCard.color === COLOR_RED && leadColor !== COLOR_RED) {
+        // 1. If winning with RED (Trump), check LEAD color first
+        if (winCard.color === COLOR_RED) {
+            // First priority: Remove seal of the LEAD color (if player has it)
             if (p.seals[leadColor] > 0) {
                 p.seals[leadColor]--;
                 return 2.0;
             }
+            // Second priority: Remove RED seal
+            if (p.seals[COLOR_RED] > 0) {
+                p.seals[COLOR_RED]--;
+                return 2.0;
+            }
+        }
+        // 2. Normal case (Non-Red win OR Red win but no relevant seals found above)
+        // Check if we can remove the seal of the winning card's color
+        // (Note: If Red win fell through above, this check covers Red seal again, which is redundant but safe)
+        else if (p.seals[winCard.color] > 0) {
+            p.seals[winCard.color]--;
+            return 2.0;
         }
 
         // 3. Penalty

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="en">
 
@@ -103,3 +104,112 @@
 </body>
 
 </html>
+=======
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wizard Extreme</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+</head>
+
+<body>
+    <div class="container">
+        <h1>🧙 Wizard Extreme</h1>
+
+        <!-- Lobby - Select Each AI's Difficulty -->
+        <div id="difficulty-select">
+            <h2>Set Up Your Opponents</h2>
+            <div class="lobby">
+                <div class="opponent-select">
+                    <div class="opponent-label">AI 1</div>
+                    <select id="ai1-difficulty" class="difficulty-dropdown">
+                        <option value="easy">Easy</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="hard">Hard</option>
+                    </select>
+                </div>
+                <div class="vs-label">VS</div>
+                <div class="opponent-select">
+                    <div class="opponent-label">YOU</div>
+                </div>
+                <div class="vs-label">VS</div>
+                <div class="opponent-select">
+                    <div class="opponent-label">AI 2</div>
+                    <select id="ai2-difficulty" class="difficulty-dropdown">
+                        <option value="easy">Easy</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="hard">Hard</option>
+                    </select>
+                </div>
+            </div>
+            <button id="start-game-btn" class="btn start-btn">Start Game</button>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="hidden">
+            <div class="spinner"></div>
+            <p>Loading AI models...</p>
+        </div>
+
+        <!-- Game Area -->
+        <div id="game-area" class="hidden">
+            <div id="status">BIDDING | Trick 1/15 | Your turn</div>
+
+            <!-- Table -->
+            <div class="table">
+                <!-- Opponents -->
+                <div class="opponents-row">
+                    <div class="opponent">
+                        <div class="opponent-name">AI 1</div>
+                        <div id="opponent-1-hand" class="opponent-hand"></div>
+                        <div id="opponent-1-seals" class="opponent-seals"></div>
+                    </div>
+                    <div class="opponent">
+                        <div class="opponent-name">AI 2</div>
+                        <div id="opponent-2-hand" class="opponent-hand"></div>
+                        <div id="opponent-2-seals" class="opponent-seals"></div>
+                    </div>
+                </div>
+
+                <!-- Trick Area -->
+                <div id="trick-area"></div>
+
+                <!-- Pool -->
+                <div id="pool-seals"></div>
+            </div>
+
+            <!-- Player Area -->
+            <div class="player-area">
+                <div id="player-hand"></div>
+                <div id="player-seals"></div>
+
+                <!-- Bid Buttons -->
+                <div id="bid-buttons" class="hidden">
+                    <button class="bid-btn" data-action="0">Red</button>
+                    <button class="bid-btn" data-action="1">Blue</button>
+                    <button class="bid-btn" data-action="2">Yellow</button>
+                    <button class="bid-btn" data-action="3">Green</button>
+                    <button class="bid-btn" data-action="4">Purple</button>
+                    <button class="bid-btn" data-action="5">Pass</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Over -->
+        <div id="game-over" class="hidden"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/ai.js"></script>
+    <script src="js/ui.js"></script>
+</body>
+
+
+</html>
+>>>>>>> 0e4c11f4a17498f75b864b2a1fa5e7d6f839ccf6

@@ -1,1 +1,5 @@
+<<<<<<< HEAD
 input_dim=364
+=======
+input_dim=364
+>>>>>>> 0e4c11f4a17498f75b864b2a1fa5e7d6f839ccf6

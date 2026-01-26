@@ -115,8 +115,9 @@ class WizardExtremeGame {
                 if (this.currentTrick.length < NUM_PLAYERS) {
                     this.currentPlayerIdx = (this.currentPlayerIdx + 1) % NUM_PLAYERS;
                 } else {
+                    const leadColor = this.currentTrick[0].card.color;
                     const { winnerIdx, winCard } = this._resolveTrick();
-                    const stepReward = this._assignTrickResult(winnerIdx, winCard);
+                    const stepReward = this._assignTrickResult(winnerIdx, winCard, leadColor);
                     info.rewards[winnerIdx] = stepReward;
                     reward = info.rewards[this.currentPlayerIdx];
 
@@ -171,12 +172,24 @@ class WizardExtremeGame {
         return { winnerIdx, winCard: bestCard };
     }
 
-    _assignTrickResult(winnerIdx, winCard) {
+    _assignTrickResult(winnerIdx, winCard, leadColor) {
         const p = this.players[winnerIdx];
+
+        // 1. Try to remove seal of winning card color (standard rule)
         if (p.seals[winCard.color] > 0) {
             p.seals[winCard.color]--;
             return 2.0;
         }
+
+        // 2. Special Case: Winning with Red (Trump) checks lead color next
+        if (winCard.color === COLOR_RED && leadColor !== COLOR_RED) {
+            if (p.seals[leadColor] > 0) {
+                p.seals[leadColor]--;
+                return 2.0;
+            }
+        }
+
+        // 3. Penalty
         p.blackSeals++;
         return -3.0;
     }

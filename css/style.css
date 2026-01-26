@@ -168,7 +168,7 @@ h1 {
 .opponent-seals {
     display: flex;
     justify-content: center;
-    gap: 5px;
+    /* Removed gap to let groups handle spacing */
     margin-top: 10px;
 }
 
@@ -211,9 +211,14 @@ h1 {
 #pool-seals {
     display: flex;
     justify-content: center;
-    gap: 10px;
     align-items: center;
     margin: 20px 0;
+}
+
+.seals-container {
+    display: flex;
+    gap: 10px;
+    margin-left: 10px;
 }
 
 .seal-label {
@@ -240,7 +245,7 @@ h1 {
 #player-seals {
     display: flex;
     justify-content: center;
-    gap: 5px;
+    /* Removed gap to let groups handle spacing */
     margin-top: 10px;
 }
 
@@ -330,6 +335,27 @@ h1 {
     font-size: 12px;
     font-weight: bold;
     box-shadow: 1px 1px 4px rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+    /* Prevent hover issues on overlap */
+}
+
+/* Groups of seals for overlap effect */
+.seal-group {
+    display: flex;
+    margin-right: 12px;
+    /* Spacing between color groups */
+}
+
+.seal-group .seal {
+    margin-left: -18px;
+    /* Negative margin for overlap */
+    position: relative;
+    z-index: 1;
+}
+
+.seal-group .seal:first-child {
+    margin-left: 0;
+    z-index: 0;
 }
 
 .seal-color-0 {

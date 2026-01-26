@@ -186,14 +186,24 @@ class GameUI {
         if (this.game.phase === 'BIDDING') {
             poolContainer.classList.remove('hidden');
             poolContainer.innerHTML = '<div class="seal-label">Pool:</div>';
+
+            const sealsContainer = document.createElement('div');
+            sealsContainer.className = 'seals-container';
+
             for (let c = 0; c < 5; c++) {
                 const count = this.game.poolSeals[c];
-                for (let i = 0; i < count; i++) {
-                    const seal = document.createElement('div');
-                    seal.className = `seal seal-color-${c}`;
-                    poolContainer.appendChild(seal);
+                if (count > 0) {
+                    const group = document.createElement('div');
+                    group.className = 'seal-group';
+                    for (let i = 0; i < count; i++) {
+                        const seal = document.createElement('div');
+                        seal.className = `seal seal-color-${c}`;
+                        group.appendChild(seal);
+                    }
+                    sealsContainer.appendChild(group);
                 }
             }
+            poolContainer.appendChild(sealsContainer);
         } else {
             poolContainer.classList.add('hidden');
         }
@@ -206,20 +216,31 @@ class GameUI {
             if (!container) continue;
 
             container.innerHTML = '';
+
             // Colored seals
             for (let c = 0; c < 5; c++) {
                 const count = player.seals[c];
-                for (let i = 0; i < count; i++) {
-                    const seal = document.createElement('div');
-                    seal.className = `seal seal-color-${c}`;
-                    container.appendChild(seal);
+                if (count > 0) {
+                    const group = document.createElement('div');
+                    group.className = 'seal-group';
+                    for (let i = 0; i < count; i++) {
+                        const seal = document.createElement('div');
+                        seal.className = `seal seal-color-${c}`;
+                        group.appendChild(seal);
+                    }
+                    container.appendChild(group);
                 }
             }
             // Black seals
-            for (let i = 0; i < player.blackSeals; i++) {
-                const black = document.createElement('div');
-                black.className = 'seal seal-black';
-                container.appendChild(black);
+            if (player.blackSeals > 0) {
+                const group = document.createElement('div');
+                group.className = 'seal-group';
+                for (let i = 0; i < player.blackSeals; i++) {
+                    const black = document.createElement('div');
+                    black.className = 'seal seal-black';
+                    group.appendChild(black);
+                }
+                container.appendChild(group);
             }
         }
     }

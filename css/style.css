@@ -492,3 +492,94 @@ h1 {
 .btn:hover {
     opacity: 0.9;
 }
+
+/* Joker Seals (White) */
+.seal-joker {
+    background: linear-gradient(135deg, #ffffff 0%, #e0e0e0 100%);
+    color: #333;
+    border: 2px solid #ffd700;
+}
+
+/* Action Labels */
+.action-label {
+    color: #a0a0a0;
+    font-size: 12px;
+    margin: 10px 0 5px 0;
+    width: 100%;
+    text-align: center;
+}
+
+/* Steal Buttons */
+#steal-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.steal-btn {
+    padding: 6px 12px;
+    border: 2px dashed #666;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 12px;
+    transition: transform 0.2s;
+    background: rgba(0,0,0,0.3);
+    color: #a0a0a0;
+}
+
+.steal-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.steal-btn:not(:disabled):hover {
+    transform: scale(1.05);
+    border-color: #ffd700;
+    color: #ffd700;
+}
+
+/* Discard Buttons */
+#discard-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 15px;
+    padding: 15px;
+    background: rgba(255, 215, 0, 0.1);
+    border-radius: 10px;
+    border: 2px solid #ffd700;
+}
+
+.discard-btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: transform 0.2s;
+}
+
+.discard-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.discard-btn:not(:disabled):hover {
+    transform: scale(1.05);
+}
+
+.discard-btn[data-action="61"] { background: #ff5252; color: #fff; }
+.discard-btn[data-action="62"] { background: #448aff; color: #fff; }
+.discard-btn[data-action="63"] { background: #ffeb3b; color: #000; }
+.discard-btn[data-action="64"] { background: #69f0ae; color: #000; }
+.discard-btn[data-action="65"] { background: #ce93d8; color: #fff; }
+
+.joker-btn {
+    background: linear-gradient(135deg, #fff 0%, #e0e0e0 100%);
+    color: #333;
+    border: 2px solid #ffd700;
+}

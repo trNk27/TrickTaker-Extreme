@@ -1,5 +1,5 @@
 // Wizard Extreme UI Controller
-// Handles rendering and user interaction
+// Handles rendering and user interaction (v2 - with Joker Seals and Decision Step)
 
 class GameUI {
     constructor() {
@@ -11,9 +11,9 @@ class GameUI {
         this.autoPlayTimeout = null;
 
         // Match state (3 games per match)
-        this.matchRound = 0; // 0, 1, 2 (each round, starting player rotates)
-        this.totalScores = [0, 0, 0]; // Cumulative scores across all rounds
-        this.roundScores = []; // Array of score arrays for each round
+        this.matchRound = 0;
+        this.totalScores = [0, 0, 0];
+        this.roundScores = [];
         this.ai1Difficulty = 'medium';
         this.ai2Difficulty = 'medium';
     }
@@ -27,33 +27,38 @@ class GameUI {
         // Start game button
         document.getElementById('start-game-btn')?.addEventListener('click', () => this.startMatch());
 
-        // Bid buttons
+        // Bid buttons (0-4: take seal, 5: pass)
         document.querySelectorAll('.bid-btn').forEach(btn => {
             btn.addEventListener('click', () => this.handleBid(parseInt(btn.dataset.action)));
+        });
+
+        // Steal buttons (6-15)
+        document.querySelectorAll('.steal-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.handleBid(parseInt(btn.dataset.action)));
+        });
+
+        // Discard buttons (61-66)
+        document.querySelectorAll('.discard-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.handleDiscard(parseInt(btn.dataset.action)));
         });
     }
 
     async startMatch() {
-        // Get selected difficulties
         this.ai1Difficulty = document.getElementById('ai1-difficulty').value;
         this.ai2Difficulty = document.getElementById('ai2-difficulty').value;
 
-        // Show loading
         document.getElementById('difficulty-select').classList.add('hidden');
         document.getElementById('loading').classList.remove('hidden');
 
-        // Load AI models
         console.log(`Loading AI 1: ${this.ai1Difficulty}, AI 2: ${this.ai2Difficulty}`);
         await this.ai[0].loadModel(this.ai1Difficulty);
         await this.ai[1].loadModel(this.ai2Difficulty);
 
-        // Reset match state
         this.matchRound = 0;
         this.totalScores = [0, 0, 0];
         this.roundScores = [];
 
         document.getElementById('loading').classList.add('hidden');
-
         this.startRound();
     }
 
@@ -62,18 +67,15 @@ class GameUI {
         document.getElementById('game-area').classList.remove('hidden');
         document.getElementById('game-over').classList.add('hidden');
 
-        // Update opponent labels
         document.querySelector('.opponents-row .opponent:first-child .opponent-name').textContent =
             `AI 1 (${this.ai1Difficulty.charAt(0).toUpperCase() + this.ai1Difficulty.slice(1)})`;
         document.querySelector('.opponents-row .opponent:last-child .opponent-name').textContent =
             `AI 2 (${this.ai2Difficulty.charAt(0).toUpperCase() + this.ai2Difficulty.slice(1)})`;
 
-        // Set starting player based on round (rotate seats)
         this.game.startingPlayerOffset = this.matchRound;
         this.game.reset();
         this.gameStarted = true;
 
-        // Update status to show round
         this.render();
         this.processNextTurn();
     }
@@ -92,6 +94,7 @@ class GameUI {
         this.renderTrick();
         this.renderBidding();
         this.renderSeals();
+        this.renderDiscard();
         this.renderStatus();
     }
 
@@ -106,7 +109,7 @@ class GameUI {
             const cardEl = this.createCardElement(card);
             const isPlayable = this.game.phase === 'PLAYING' &&
                 this.game.currentPlayerIdx === this.humanPlayer &&
-                legalMask[card.id + 6];
+                legalMask[card.id + 16]; // Actions 16-60 for cards
 
             if (isPlayable) {
                 cardEl.classList.add('playable');
@@ -124,7 +127,6 @@ class GameUI {
 
             const player = this.game.players[pIdx];
             const count = player.hand.length;
-            // Fan parameters
             const angleStep = 4;
             const startAngle = -((count - 1) * angleStep) / 2;
 
@@ -132,14 +134,12 @@ class GameUI {
                 const cardBack = document.createElement('div');
                 cardBack.className = 'card card-back';
 
-                // Fan rotation and arc
                 const angle = startAngle + (i * angleStep);
                 const translateY = Math.abs(angle) * 0.5;
 
                 cardBack.style.transform = `rotate(${angle}deg) translateY(${translateY}px)`;
                 cardBack.style.transformOrigin = 'bottom center';
 
-                // Overlap for compactness (except first card)
                 if (i > 0) {
                     cardBack.style.marginLeft = '-22px';
                 }
@@ -162,16 +162,47 @@ class GameUI {
     }
 
     renderBidding() {
-        const container = document.getElementById('bid-buttons');
+        const bidContainer = document.getElementById('bid-buttons');
+        const stealContainer = document.getElementById('steal-buttons');
+
         const isHumanBidding = this.game.phase === 'BIDDING' &&
             this.game.currentPlayerIdx === this.humanPlayer &&
             !this.game.players[this.humanPlayer].hasPassedBidding;
 
         if (isHumanBidding) {
+            bidContainer.classList.remove('hidden');
+            stealContainer.classList.remove('hidden');
+            const legalMask = this.game.getLegalActions(this.humanPlayer);
+
+            // Bid buttons (0-5)
+            document.querySelectorAll('.bid-btn').forEach(btn => {
+                const action = parseInt(btn.dataset.action);
+                btn.disabled = !legalMask[action];
+            });
+
+            // Steal buttons (6-15)
+            document.querySelectorAll('.steal-btn').forEach(btn => {
+                const action = parseInt(btn.dataset.action);
+                btn.disabled = !legalMask[action];
+            });
+        } else {
+            bidContainer.classList.add('hidden');
+            stealContainer.classList.add('hidden');
+        }
+    }
+
+    renderDiscard() {
+        const container = document.getElementById('discard-buttons');
+
+        const isHumanDiscarding = this.game.phase === 'DISCARDING' &&
+            this.game.currentPlayerIdx === this.humanPlayer;
+
+        if (isHumanDiscarding) {
             container.classList.remove('hidden');
             const legalMask = this.game.getLegalActions(this.humanPlayer);
 
-            document.querySelectorAll('.bid-btn').forEach(btn => {
+            // Discard buttons (61-66)
+            document.querySelectorAll('.discard-btn').forEach(btn => {
                 const action = parseInt(btn.dataset.action);
                 btn.disabled = !legalMask[action];
             });
@@ -208,7 +239,7 @@ class GameUI {
             poolContainer.classList.add('hidden');
         }
 
-        // Player seals - individual circles
+        // Player seals
         for (let pIdx = 0; pIdx < 3; pIdx++) {
             const player = this.game.players[pIdx];
             const containerId = pIdx === 0 ? 'player-seals' : `opponent-${pIdx}-seals`;
@@ -231,6 +262,19 @@ class GameUI {
                     container.appendChild(group);
                 }
             }
+
+            // Joker seals (white)
+            if (player.jokerSeals > 0) {
+                const group = document.createElement('div');
+                group.className = 'seal-group';
+                for (let i = 0; i < player.jokerSeals; i++) {
+                    const joker = document.createElement('div');
+                    joker.className = 'seal seal-joker';
+                    group.appendChild(joker);
+                }
+                container.appendChild(group);
+            }
+
             // Black seals
             if (player.blackSeals > 0) {
                 const group = document.createElement('div');
@@ -256,7 +300,6 @@ class GameUI {
     }
 
     createCardElement(card) {
-        // Rank emojis from weakest (1) to strongest (9)
         const rankEmojis = ['🐜', '🐁', '🐇', '🦊', '🐺', '🦅', '🦁', '🐉', '👑'];
         const emoji = rankEmojis[card.value - 1];
 
@@ -270,7 +313,7 @@ class GameUI {
         if (this.game.phase !== 'PLAYING') return;
         if (this.game.currentPlayerIdx !== this.humanPlayer) return;
 
-        const action = card.id + 6;
+        const action = card.id + 16; // Actions 16-60 for cards
         const legalMask = this.game.getLegalActions(this.humanPlayer);
         if (!legalMask[action]) return;
 
@@ -287,17 +330,28 @@ class GameUI {
         this.playAction(action);
     }
 
+    handleDiscard(action) {
+        if (this.game.phase !== 'DISCARDING') return;
+        if (this.game.currentPlayerIdx !== this.humanPlayer) return;
+
+        const legalMask = this.game.getLegalActions(this.humanPlayer);
+        if (!legalMask[action]) return;
+
+        this.playAction(action);
+    }
+
     playAction(action) {
         // Check if this will complete a trick (3rd card)
         const trickWillComplete = this.game.phase === 'PLAYING' &&
-            this.game.currentTrick.length === 2;
+            this.game.currentTrick.length === 2 &&
+            action >= 16 && action <= 60;
 
-        if (trickWillComplete && action >= 6) {
+        if (trickWillComplete) {
             // Show the 3rd card BEFORE step clears it
-            const cardId = action - 6;
+            const cardId = action - 16;
             this.showThirdCard(cardId, this.game.currentPlayerIdx);
 
-            // Wait 2 seconds to show all 3 cards, then process
+            // Wait to show all 3 cards, then process
             setTimeout(() => {
                 const result = this.game.step(action);
                 this.render();
@@ -319,7 +373,6 @@ class GameUI {
     }
 
     showThirdCard(cardId, playerIdx) {
-        // Manually add the 3rd card to the trick display
         const rankEmojis = ['🐜', '🐁', '🐇', '🦊', '🐺', '🦅', '🦁', '🐉', '👑'];
         const container = document.getElementById('trick-area');
         const wrapper = document.createElement('div');
@@ -356,11 +409,12 @@ class GameUI {
 
         // Check if this will complete a trick
         const trickWillComplete = this.game.phase === 'PLAYING' &&
-            this.game.currentTrick.length === 2;
+            this.game.currentTrick.length === 2 &&
+            action >= 16 && action <= 60;
 
-        if (trickWillComplete && action >= 6) {
+        if (trickWillComplete) {
             // Show the 3rd card first
-            const cardId = action - 6;
+            const cardId = action - 16;
             this.showThirdCard(cardId, currentPlayer);
 
             // Wait then process
@@ -387,7 +441,6 @@ class GameUI {
     handleRoundOver(scores) {
         this.gameStarted = false;
 
-        // Update cumulative scores
         this.roundScores.push(scores);
         for (let i = 0; i < 3; i++) {
             this.totalScores[i] += scores[i];
@@ -403,7 +456,6 @@ class GameUI {
 
         let html = '';
         if (isMatchOver) {
-            const winner = this.totalScores.indexOf(Math.max(...this.totalScores));
             html = `<h2>🏆 Match Results 🏆</h2>`;
             html += `<h3 style="color:#a0a0a0; margin-bottom:15px">Final Totals after 3 Games</h3>`;
         } else {
@@ -413,7 +465,6 @@ class GameUI {
 
         html += '<div class="scores" style="text-align:left; display:inline-block; min-width:300px">';
 
-        // Header row
         html += '<div class="score-row" style="border-bottom:1px solid #444; margin-bottom:10px; font-size:14px; color:#aaa">' +
             '<span style="display:inline-block; width:100px">Player</span>' +
             '<span style="display:inline-block; width:80px">Round</span>' +
@@ -446,7 +497,7 @@ class GameUI {
             actionBtn.addEventListener('click', () => {
                 document.getElementById('loading').classList.remove('hidden');
                 document.getElementById('game-over').classList.add('hidden');
-                setTimeout(() => this.startRound(), 500); // Small delay to show loading
+                setTimeout(() => this.startRound(), 500);
             });
         }
         container.appendChild(actionBtn);

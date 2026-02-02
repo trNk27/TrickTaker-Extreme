@@ -1,70 +1,18 @@
 // Wizard Extreme AI - ONNX Model Interface
-// Handles model loading, state adaptation, and inference
+// Handles model loading and inference for 373-dim state, 67 actions
 
-// Model input dimensions
-const MODEL_INPUT_DIMS = {
-    'easy': 169,
-    'medium': 169,
-    'hard': 364
-};
-
-/**
- * Adapt 364-dim current state to 169-dim legacy state format.
- * See legacy_ai_model.py for reference.
- */
-function adaptStateToLegacy(currentState) {
-    const legacy = [];
-
-    // 1. Own Hand [0:45] -> [0:45] (same)
-    for (let i = 0; i < 45; i++) legacy.push(currentState[i]);
-
-    // 2. Pool [45:50] -> [45:50] (denormalize: multiply by 5)
-    for (let i = 45; i < 50; i++) legacy.push(currentState[i] * 5.0);
-
-    // 3. Active Player Bids [50:65] -> [50:65] (denormalize: multiply by 5)
-    for (let i = 50; i < 65; i++) legacy.push(currentState[i] * 5.0);
-
-    // 4. History [83:128] -> [65:110]
-    for (let i = 83; i < 128; i++) legacy.push(currentState[i]);
-
-    // 5. Trick: collapse [128:263] (45*3 matrix) -> [110:155] (45 OR of all)
-    for (let cardIdx = 0; cardIdx < 45; cardIdx++) {
-        let played = 0;
-        for (let player = 0; player < 3; player++) {
-            if (currentState[128 + player * 45 + cardIdx] > 0) {
-                played = 1;
-                break;
-            }
-        }
-        legacy.push(played);
-    }
-
-    // 6. Personal Status: My seals [50:55] + black seal from [80]
-    for (let i = 50; i < 55; i++) legacy.push(currentState[i] * 5.0);
-    legacy.push(currentState[80] * 15.0);
-
-    // 7. Position: [1, 0, 0] (ego-centric - always "me")
-    legacy.push(1.0, 0.0, 0.0);
-
-    // 8. Hand Counts [358:363] -> [164:169] (denormalize: multiply by 15)
-    for (let i = 358; i < 363; i++) legacy.push(currentState[i] * 15.0);
-
-    return new Float32Array(legacy);
-}
-
+const STATE_DIM_AI = 373;
+const ACTION_DIM_AI = 67;
 
 class WizardAI {
     constructor() {
         this.session = null;
         this.difficulty = 'medium';
         this.modelLoaded = false;
-        this.inputDim = 364;
     }
 
     async loadModel(difficulty) {
         this.difficulty = difficulty;
-        this.inputDim = MODEL_INPUT_DIMS[difficulty] || 364;
-
         const modelPath = `models/${difficulty}.onnx`;
 
         try {
@@ -72,7 +20,7 @@ class WizardAI {
                 executionProviders: ['wasm']
             });
             this.modelLoaded = true;
-            console.log(`Loaded ${difficulty} model (input_dim=${this.inputDim})`);
+            console.log(`Loaded ${difficulty} model (input_dim=${STATE_DIM_AI}, action_dim=${ACTION_DIM_AI})`);
             return true;
         } catch (error) {
             console.error(`Failed to load model: ${error}`);
@@ -83,30 +31,45 @@ class WizardAI {
 
     async getAction(stateVector, legalActionsMask) {
         if (!this.modelLoaded) {
+            console.warn('Model not loaded, using random action');
             return this.getRandomAction(legalActionsMask);
         }
 
         try {
-            // Adapt state if needed for legacy models
-            let inputState = stateVector;
-            if (this.inputDim === 169) {
-                inputState = adaptStateToLegacy(stateVector);
+            // Validate input dimensions
+            if (stateVector.length !== STATE_DIM_AI) {
+                console.error(`State vector wrong size! Got ${stateVector.length}, expected ${STATE_DIM_AI}`);
+            }
+            if (legalActionsMask.length !== ACTION_DIM_AI) {
+                console.error(`Action mask wrong size! Got ${legalActionsMask.length}, expected ${ACTION_DIM_AI}`);
             }
 
-            // Create input tensor
-            const inputTensor = new ort.Tensor('float32', inputState, [1, this.inputDim]);
+            // Create input tensor (373 dimensions)
+            const inputTensor = new ort.Tensor('float32', stateVector, [1, STATE_DIM_AI]);
 
             // Run inference
             const results = await this.session.run({ state: inputTensor });
 
-            // Get logits
+            // Get logits (67 actions)
             const logits = Array.from(results.logits.data);
 
             // Apply mask and softmax
             const probs = this.softmaxWithMask(logits, legalActionsMask);
 
+            // Debug logging
+            const legalActions = [];
+            for (let i = 0; i < legalActionsMask.length; i++) {
+                if (legalActionsMask[i]) legalActions.push(i);
+            }
+            const actionNames = ['Red', 'Blue', 'Yellow', 'Green', 'Purple', 'Pass'];
+            console.log(`AI Decision - Legal: [${legalActions.map(a => a <= 5 ? actionNames[a] : `A${a}`).join(', ')}]`);
+            console.log(`  Probs: ${legalActions.map(a => `${a <= 5 ? actionNames[a] : a}:${(probs[a] * 100).toFixed(1)}%`).join(', ')}`);
+
             // Sample action
-            return this.sampleAction(probs, legalActionsMask);
+            const action = this.sampleAction(probs, legalActionsMask);
+            console.log(`  Chosen: ${action <= 5 ? actionNames[action] : action}`);
+
+            return action;
         } catch (error) {
             console.error(`Inference error: ${error}`);
             return this.getRandomAction(legalActionsMask);
@@ -157,5 +120,5 @@ class WizardAI {
 
 // Export
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { WizardAI, adaptStateToLegacy };
+    module.exports = { WizardAI };
 }

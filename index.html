@@ -22,7 +22,6 @@
                     <select id="ai1-difficulty" class="difficulty-dropdown">
                         <option value="easy">Easy</option>
                         <option value="medium" selected>Medium</option>
-                        <option value="hard">Hard</option>
                     </select>
                 </div>
                 <div class="vs-label">VS</div>
@@ -35,7 +34,6 @@
                     <select id="ai2-difficulty" class="difficulty-dropdown">
                         <option value="easy">Easy</option>
                         <option value="medium" selected>Medium</option>
-                        <option value="hard">Hard</option>
                     </select>
                 </div>
             </div>
@@ -80,14 +78,42 @@
                 <div id="player-hand"></div>
                 <div id="player-seals"></div>
 
-                <!-- Bid Buttons -->
+                <!-- Bid Buttons (Take Seals) -->
                 <div id="bid-buttons" class="hidden">
+                    <div class="action-label">Take Seal:</div>
                     <button class="bid-btn" data-action="0">Red</button>
                     <button class="bid-btn" data-action="1">Blue</button>
                     <button class="bid-btn" data-action="2">Yellow</button>
                     <button class="bid-btn" data-action="3">Green</button>
                     <button class="bid-btn" data-action="4">Purple</button>
                     <button class="bid-btn" data-action="5">Pass</button>
+                </div>
+                
+                <!-- Steal Buttons -->
+                <div id="steal-buttons" class="hidden">
+                    <div class="action-label">Steal from AI 1:</div>
+                    <button class="steal-btn" data-action="6">Red</button>
+                    <button class="steal-btn" data-action="8">Blue</button>
+                    <button class="steal-btn" data-action="10">Yellow</button>
+                    <button class="steal-btn" data-action="12">Green</button>
+                    <button class="steal-btn" data-action="14">Purple</button>
+                    <div class="action-label">Steal from AI 2:</div>
+                    <button class="steal-btn" data-action="7">Red</button>
+                    <button class="steal-btn" data-action="9">Blue</button>
+                    <button class="steal-btn" data-action="11">Yellow</button>
+                    <button class="steal-btn" data-action="13">Green</button>
+                    <button class="steal-btn" data-action="15">Purple</button>
+                </div>
+                
+                <!-- Discard Buttons (Decision Phase) -->
+                <div id="discard-buttons" class="hidden">
+                    <div class="action-label">Choose seal to discard:</div>
+                    <button class="discard-btn" data-action="61">Red</button>
+                    <button class="discard-btn" data-action="62">Blue</button>
+                    <button class="discard-btn" data-action="63">Yellow</button>
+                    <button class="discard-btn" data-action="64">Green</button>
+                    <button class="discard-btn" data-action="65">Purple</button>
+                    <button class="discard-btn joker-btn" data-action="66">🃏 Use Joker</button>
                 </div>
             </div>
         </div>

@@ -1,19 +1,16 @@
-// Wizard Extreme UI Controller
-// Handles rendering and user interaction (v2 - with Joker Seals and Decision Step)
+// Wizard Extreme UI Controller — Arcane direction
+// Renders into the new index.html markup. Game logic untouched.
 
 class GameUI {
     constructor() {
         this.game = new WizardExtremeGame();
-        this.ai = [new WizardAI(), new WizardAI()]; // AI for players 1 and 2
+        this.ai = [new WizardAI(), new WizardAI()];
         this.humanPlayer = 0;
-        this.selectedCard = null;
         this.gameStarted = false;
-        this.autoPlayTimeout = null;
 
-        // Match state (3 games per match)
         this.matchRound = 0;
         this.totalScores = [0, 0, 0];
-        this.roundScores = [];
+        this.roundScores = []; // array of [s0,s1,s2] per completed round
         this.ai1Difficulty = 'medium';
         this.ai2Difficulty = 'medium';
     }
@@ -24,22 +21,33 @@ class GameUI {
     }
 
     setupEventListeners() {
-        // Start game button
         document.getElementById('start-game-btn')?.addEventListener('click', () => this.startMatch());
 
-        // Bid buttons (0-4: take seal, 5: pass)
         document.querySelectorAll('.bid-btn').forEach(btn => {
             btn.addEventListener('click', () => this.handleBid(parseInt(btn.dataset.action)));
         });
-
-        // Steal buttons (6-15)
         document.querySelectorAll('.steal-btn').forEach(btn => {
             btn.addEventListener('click', () => this.handleBid(parseInt(btn.dataset.action)));
         });
-
-        // Discard buttons (61-66)
         document.querySelectorAll('.discard-btn').forEach(btn => {
             btn.addEventListener('click', () => this.handleDiscard(parseInt(btn.dataset.action)));
+        });
+
+        // Rules modal
+        const rulesBtn = document.getElementById('rules-btn');
+        const lobbyRulesBtn = document.getElementById('lobby-rules-btn');
+        const rulesModal = document.getElementById('rules-modal');
+        const rulesClose = document.getElementById('rules-close');
+        const openRules = () => rulesModal.classList.remove('hidden');
+        const closeRules = () => rulesModal.classList.add('hidden');
+        rulesBtn?.addEventListener('click', openRules);
+        lobbyRulesBtn?.addEventListener('click', openRules);
+        rulesClose?.addEventListener('click', closeRules);
+        rulesModal?.addEventListener('click', (e) => {
+            if (e.target === rulesModal) closeRules();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !rulesModal.classList.contains('hidden')) closeRules();
         });
     }
 
@@ -50,7 +58,6 @@ class GameUI {
         document.getElementById('difficulty-select').classList.add('hidden');
         document.getElementById('loading').classList.remove('hidden');
 
-        console.log(`Loading AI 1: ${this.ai1Difficulty}, AI 2: ${this.ai2Difficulty}`);
         await this.ai[0].loadModel(this.ai1Difficulty);
         await this.ai[1].loadModel(this.ai2Difficulty);
 
@@ -67,10 +74,12 @@ class GameUI {
         document.getElementById('game-area').classList.remove('hidden');
         document.getElementById('game-over').classList.add('hidden');
 
-        document.querySelector('.opponents-row .opponent:first-child .opponent-name').textContent =
-            `AI 1 (${this.ai1Difficulty.charAt(0).toUpperCase() + this.ai1Difficulty.slice(1)})`;
-        document.querySelector('.opponents-row .opponent:last-child .opponent-name').textContent =
-            `AI 2 (${this.ai2Difficulty.charAt(0).toUpperCase() + this.ai2Difficulty.slice(1)})`;
+        // Set opponent labels
+        const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+        document.getElementById('opponent-1-name').textContent = 'AI 1';
+        document.getElementById('opponent-1-meta').textContent = cap(this.ai1Difficulty);
+        document.getElementById('opponent-2-name').textContent = 'AI 2';
+        document.getElementById('opponent-2-meta').textContent = cap(this.ai2Difficulty);
 
         this.game.startingPlayerOffset = this.matchRound;
         this.game.reset();
@@ -96,6 +105,43 @@ class GameUI {
         this.renderSeals();
         this.renderDiscard();
         this.renderStatus();
+        this.renderSidebar();
+    }
+
+    // ---------- Cards ----------
+    createCardElement(card) {
+        // Creature glyphs by rank — abstract symbols, no emoji
+        // 1..9 in escalating power
+        const glyphs = ['◦', '∙', '◆', '✦', '✧', '☽', '☼', '♕', '✶'];
+        const ranks = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+        const glyph = glyphs[card.value - 1];
+        const rank = ranks[card.value - 1];
+        const suitGlyph = ['♦', '◈', '◇', '♢', '◉'][card.color]; // abstract suit marks
+
+        const el = document.createElement('div');
+        const trumpClass = card.color === 0 ? ' trump' : '';
+        el.className = `card card-color-${card.color}${trumpClass}`;
+
+        const tl = document.createElement('div');
+        tl.className = 'card-corner tl';
+        tl.innerHTML = `${rank}<span class="card-corner-suit">${suitGlyph}</span>`;
+
+        const center = document.createElement('div');
+        center.className = 'card-center';
+        const creature = document.createElement('div');
+        creature.className = 'card-creature';
+        creature.style.fontSize = (16 + card.value * 1.6) + 'px';
+        creature.textContent = glyph;
+        center.appendChild(creature);
+
+        const br = document.createElement('div');
+        br.className = 'card-corner br';
+        br.innerHTML = `${rank}<span class="card-corner-suit">${suitGlyph}</span>`;
+
+        el.appendChild(tl);
+        el.appendChild(center);
+        el.appendChild(br);
+        return el;
     }
 
     renderHand() {
@@ -109,13 +155,12 @@ class GameUI {
             const cardEl = this.createCardElement(card);
             const isPlayable = this.game.phase === 'PLAYING' &&
                 this.game.currentPlayerIdx === this.humanPlayer &&
-                legalMask[card.id + 16]; // Actions 16-60 for cards
+                legalMask[card.id + 16];
 
             if (isPlayable) {
                 cardEl.classList.add('playable');
                 cardEl.addEventListener('click', () => this.handleCardClick(card));
             }
-
             container.appendChild(cardEl);
         }
     }
@@ -132,18 +177,10 @@ class GameUI {
 
             for (let i = 0; i < count; i++) {
                 const cardBack = document.createElement('div');
-                cardBack.className = 'card card-back';
-
+                cardBack.className = 'card-back';
                 const angle = startAngle + (i * angleStep);
                 const translateY = Math.abs(angle) * 0.5;
-
                 cardBack.style.transform = `rotate(${angle}deg) translateY(${translateY}px)`;
-                cardBack.style.transformOrigin = 'bottom center';
-
-                if (i > 0) {
-                    cardBack.style.marginLeft = '-22px';
-                }
-
                 container.appendChild(cardBack);
             }
         }
@@ -151,7 +188,7 @@ class GameUI {
 
     renderTrick() {
         const container = document.getElementById('trick-area');
-        container.innerHTML = '';
+        container.innerHTML = '<div class="trick-glow"></div>';
 
         for (const { playerIdx, card } of this.game.currentTrick) {
             const wrapper = document.createElement('div');
@@ -170,21 +207,32 @@ class GameUI {
             !this.game.players[this.humanPlayer].hasPassedBidding;
 
         if (isHumanBidding) {
-            bidContainer.classList.remove('hidden');
-            stealContainer.classList.remove('hidden');
             const legalMask = this.game.getLegalActions(this.humanPlayer);
 
-            // Bid buttons (0-5)
-            document.querySelectorAll('.bid-btn').forEach(btn => {
-                const action = parseInt(btn.dataset.action);
-                btn.disabled = !legalMask[action];
-            });
+            // Show bid panel if any take/pass action is legal
+            const anyBidLegal = legalMask.slice(0, 6).some(x => x);
+            // Show steal panel if any steal action is legal
+            const anyStealLegal = legalMask.slice(6, 16).some(x => x);
 
-            // Steal buttons (6-15)
-            document.querySelectorAll('.steal-btn').forEach(btn => {
-                const action = parseInt(btn.dataset.action);
-                btn.disabled = !legalMask[action];
-            });
+            if (anyBidLegal) {
+                bidContainer.classList.remove('hidden');
+                document.querySelectorAll('.bid-btn').forEach(btn => {
+                    const action = parseInt(btn.dataset.action);
+                    btn.disabled = !legalMask[action];
+                });
+            } else {
+                bidContainer.classList.add('hidden');
+            }
+
+            if (anyStealLegal) {
+                stealContainer.classList.remove('hidden');
+                document.querySelectorAll('.steal-btn').forEach(btn => {
+                    const action = parseInt(btn.dataset.action);
+                    btn.disabled = !legalMask[action];
+                });
+            } else {
+                stealContainer.classList.add('hidden');
+            }
         } else {
             bidContainer.classList.add('hidden');
             stealContainer.classList.add('hidden');
@@ -193,15 +241,12 @@ class GameUI {
 
     renderDiscard() {
         const container = document.getElementById('discard-buttons');
-
         const isHumanDiscarding = this.game.phase === 'DISCARDING' &&
             this.game.currentPlayerIdx === this.humanPlayer;
 
         if (isHumanDiscarding) {
             container.classList.remove('hidden');
             const legalMask = this.game.getLegalActions(this.humanPlayer);
-
-            // Discard buttons (61-66)
             document.querySelectorAll('.discard-btn').forEach(btn => {
                 const action = parseInt(btn.dataset.action);
                 btn.disabled = !legalMask[action];
@@ -212,11 +257,11 @@ class GameUI {
     }
 
     renderSeals() {
-        // Pool seals - only show during bidding
+        // Pool seals — only during bidding
         const poolContainer = document.getElementById('pool-seals');
         if (this.game.phase === 'BIDDING') {
             poolContainer.classList.remove('hidden');
-            poolContainer.innerHTML = '<div class="seal-label">Pool:</div>';
+            poolContainer.innerHTML = '<div class="pool-label">Pool</div>';
 
             const sealsContainer = document.createElement('div');
             sealsContainer.className = 'seals-container';
@@ -239,16 +284,14 @@ class GameUI {
             poolContainer.classList.add('hidden');
         }
 
-        // Player seals
+        // Player + opponent seals
         for (let pIdx = 0; pIdx < 3; pIdx++) {
             const player = this.game.players[pIdx];
             const containerId = pIdx === 0 ? 'player-seals' : `opponent-${pIdx}-seals`;
             const container = document.getElementById(containerId);
             if (!container) continue;
-
             container.innerHTML = '';
 
-            // Colored seals
             for (let c = 0; c < 5; c++) {
                 const count = player.seals[c];
                 if (count > 0) {
@@ -263,26 +306,24 @@ class GameUI {
                 }
             }
 
-            // Joker seals (white)
             if (player.jokerSeals > 0) {
                 const group = document.createElement('div');
                 group.className = 'seal-group';
                 for (let i = 0; i < player.jokerSeals; i++) {
-                    const joker = document.createElement('div');
-                    joker.className = 'seal seal-joker';
-                    group.appendChild(joker);
+                    const j = document.createElement('div');
+                    j.className = 'seal seal-joker';
+                    group.appendChild(j);
                 }
                 container.appendChild(group);
             }
 
-            // Black seals
             if (player.blackSeals > 0) {
                 const group = document.createElement('div');
                 group.className = 'seal-group';
                 for (let i = 0; i < player.blackSeals; i++) {
-                    const black = document.createElement('div');
-                    black.className = 'seal seal-black';
-                    group.appendChild(black);
+                    const b = document.createElement('div');
+                    b.className = 'seal seal-black';
+                    group.appendChild(b);
                 }
                 container.appendChild(group);
             }
@@ -290,163 +331,187 @@ class GameUI {
     }
 
     renderStatus() {
-        const status = document.getElementById('status');
-        const playerNames = ['You', 'AI 1', 'AI 2'];
-        const currentPlayer = playerNames[this.game.currentPlayerIdx];
-        const phase = this.game.phase;
-        const trick = this.game.tricksPlayed + 1;
-
-        status.textContent = `${phase} | Trick ${trick}/15 | ${currentPlayer}'s turn`;
+        const phaseLabel = {
+            'BIDDING': 'Bidding',
+            'PLAYING': 'Playing',
+            'DISCARDING': 'Choosing'
+        }[this.game.phase] || this.game.phase;
+        const playerNames = ['Your', "AI 1's", "AI 2's"];
+        const trick = Math.min(this.game.tricksPlayed + 1, 15);
+        const turnText = this.game.phase === 'BIDDING'
+            ? `${playerNames[this.game.currentPlayerIdx]} turn`
+            : `${playerNames[this.game.currentPlayerIdx]} turn`;
+        document.getElementById('status-text').textContent =
+            `${phaseLabel} · Trick ${trick}/15 · ${turnText}`;
     }
 
-    createCardElement(card) {
-        const rankEmojis = ['🐜', '🐁', '🐇', '🦊', '🐺', '🦅', '🦁', '🐉', '👑'];
-        const emoji = rankEmojis[card.value - 1];
+    renderSidebar() {
+        // Round indicator
+        const roundIdx = this.matchRound; // 0-indexed: round currently being played
+        document.getElementById('round-indicator').textContent =
+            `Round ${Math.min(roundIdx + 1, 3)} / 3`;
 
-        const el = document.createElement('div');
-        el.className = `card card-color-${card.color}`;
-        el.innerHTML = `<span class="card-value">${card.value}</span><span class="card-emoji">${emoji}</span>`;
-        return el;
+        // Round track pips
+        const track = document.getElementById('round-track');
+        track.innerHTML = '';
+        for (let i = 0; i < 3; i++) {
+            const pip = document.createElement('div');
+            pip.className = 'round-pip';
+            if (i < roundIdx) pip.classList.add('done');
+            else if (i === roundIdx) pip.classList.add('current');
+            pip.textContent = `R${i + 1}`;
+            track.appendChild(pip);
+        }
+
+        // Standings (running totals — sorted by score, you highlighted)
+        const standings = document.getElementById('standings');
+        standings.innerHTML = '';
+        const names = ['You', 'AI 1', 'AI 2'];
+        const entries = [0, 1, 2].map(i => ({
+            idx: i,
+            name: names[i],
+            total: this.totalScores[i]
+        }));
+        entries.sort((a, b) => b.total - a.total);
+        entries.forEach((e, rank) => {
+            const row = document.createElement('div');
+            row.className = 'score-row' + (e.idx === 0 ? ' you' : '');
+            const valClass = e.total > 0 ? 'pos' : (e.total < 0 ? 'neg' : '');
+            row.innerHTML = `
+                <div class="score-name">
+                    <span class="score-rank">${rank + 1}</span>
+                    ${e.name}
+                </div>
+                <div class="score-val ${valClass}">${e.total > 0 ? '+' : ''}${e.total}</div>
+            `;
+            standings.appendChild(row);
+        });
+
+        // By-round table
+        const table = document.getElementById('rounds-table');
+        table.innerHTML = '';
+        const head = document.createElement('div');
+        head.className = 'rounds-head';
+        head.innerHTML = `<span>Player</span><span>R1</span><span>R2</span><span>R3</span>`;
+        table.appendChild(head);
+        for (let i = 0; i < 3; i++) {
+            const row = document.createElement('div');
+            row.className = 'rounds-row';
+            const r1 = this.roundScores[0]?.[i];
+            const r2 = this.roundScores[1]?.[i];
+            const r3 = this.roundScores[2]?.[i];
+            const fmt = (v) => (v === undefined ? '—' : (v > 0 ? `+${v}` : `${v}`));
+            const cls = (v) => v === undefined ? 'v pending' : 'v';
+            row.innerHTML = `
+                <div class="name">${names[i]}</div>
+                <div class="${cls(r1)}">${fmt(r1)}</div>
+                <div class="${cls(r2)}">${fmt(r2)}</div>
+                <div class="${cls(r3)}">${fmt(r3)}</div>
+            `;
+            table.appendChild(row);
+        }
     }
 
+    // ---------- Interaction ----------
     handleCardClick(card) {
         if (this.game.phase !== 'PLAYING') return;
         if (this.game.currentPlayerIdx !== this.humanPlayer) return;
-
-        const action = card.id + 16; // Actions 16-60 for cards
+        const action = card.id + 16;
         const legalMask = this.game.getLegalActions(this.humanPlayer);
         if (!legalMask[action]) return;
-
         this.playAction(action);
     }
 
     handleBid(action) {
         if (this.game.phase !== 'BIDDING') return;
         if (this.game.currentPlayerIdx !== this.humanPlayer) return;
-
         const legalMask = this.game.getLegalActions(this.humanPlayer);
         if (!legalMask[action]) return;
-
         this.playAction(action);
     }
 
     handleDiscard(action) {
         if (this.game.phase !== 'DISCARDING') return;
         if (this.game.currentPlayerIdx !== this.humanPlayer) return;
-
         const legalMask = this.game.getLegalActions(this.humanPlayer);
         if (!legalMask[action]) return;
-
         this.playAction(action);
     }
 
     playAction(action) {
-        // Check if this will complete a trick (3rd card)
         const trickWillComplete = this.game.phase === 'PLAYING' &&
             this.game.currentTrick.length === 2 &&
             action >= 16 && action <= 60;
 
         if (trickWillComplete) {
-            // Show the 3rd card BEFORE step clears it
             const cardId = action - 16;
             this.showThirdCard(cardId, this.game.currentPlayerIdx);
-
-            // Wait to show all 3 cards, then process
             setTimeout(() => {
                 const result = this.game.step(action);
                 this.render();
-                if (result.done) {
-                    this.handleRoundOver(result.info.scores);
-                } else {
-                    setTimeout(() => this.processNextTurn(), 500);
-                }
+                if (result.done) this.handleRoundOver(result.info.scores);
+                else setTimeout(() => this.processNextTurn(), 500);
             }, 2000);
         } else {
             const result = this.game.step(action);
             this.render();
-            if (result.done) {
-                this.handleRoundOver(result.info.scores);
-            } else {
-                setTimeout(() => this.processNextTurn(), 500);
-            }
+            if (result.done) this.handleRoundOver(result.info.scores);
+            else setTimeout(() => this.processNextTurn(), 500);
         }
     }
 
     showThirdCard(cardId, playerIdx) {
-        const rankEmojis = ['🐜', '🐁', '🐇', '🦊', '🐺', '🦅', '🦁', '🐉', '👑'];
         const container = document.getElementById('trick-area');
         const wrapper = document.createElement('div');
         wrapper.className = `trick-card trick-pos-${playerIdx}`;
-        const cardEl = document.createElement('div');
         const color = Math.floor(cardId / 9);
         const value = (cardId % 9) + 1;
-        const emoji = rankEmojis[value - 1];
-        cardEl.className = `card card-color-${color}`;
-        cardEl.innerHTML = `<span class="card-value">${value}</span><span class="card-emoji">${emoji}</span>`;
-        wrapper.appendChild(cardEl);
+        const card = { id: cardId, color, value };
+        wrapper.appendChild(this.createCardElement(card));
         container.appendChild(wrapper);
     }
 
     async processNextTurn() {
         if (!this.gameStarted) return;
-
         const currentPlayer = this.game.currentPlayerIdx;
+        if (currentPlayer === this.humanPlayer) return;
 
-        // If human's turn, wait for input
-        if (currentPlayer === this.humanPlayer) {
-            return;
-        }
-
-        // AI turn
         const aiIndex = currentPlayer - 1;
         const state = this.game.getState(currentPlayer);
         const mask = this.game.getLegalActions(currentPlayer);
-
         const action = await this.ai[aiIndex].getAction(state, mask);
 
-        // Small delay for visual effect
         await new Promise(resolve => setTimeout(resolve, 300));
 
-        // Check if this will complete a trick
         const trickWillComplete = this.game.phase === 'PLAYING' &&
             this.game.currentTrick.length === 2 &&
             action >= 16 && action <= 60;
 
         if (trickWillComplete) {
-            // Show the 3rd card first
             const cardId = action - 16;
             this.showThirdCard(cardId, currentPlayer);
-
-            // Wait then process
             setTimeout(() => {
                 const result = this.game.step(action);
                 this.render();
-                if (result.done) {
-                    this.handleRoundOver(result.info.scores);
-                } else {
-                    setTimeout(() => this.processNextTurn(), 500);
-                }
+                if (result.done) this.handleRoundOver(result.info.scores);
+                else setTimeout(() => this.processNextTurn(), 500);
             }, 2000);
         } else {
             const result = this.game.step(action);
             this.render();
-            if (result.done) {
-                this.handleRoundOver(result.info.scores);
-            } else {
-                setTimeout(() => this.processNextTurn(), 500);
-            }
+            if (result.done) this.handleRoundOver(result.info.scores);
+            else setTimeout(() => this.processNextTurn(), 500);
         }
     }
 
     handleRoundOver(scores) {
         this.gameStarted = false;
-
         this.roundScores.push(scores);
-        for (let i = 0; i < 3; i++) {
-            this.totalScores[i] += scores[i];
-        }
-
+        for (let i = 0; i < 3; i++) this.totalScores[i] += scores[i];
         this.matchRound++;
+
+        // Re-render sidebar with updated scores
+        this.renderSidebar();
 
         const container = document.getElementById('game-over');
         container.classList.remove('hidden');
@@ -456,55 +521,59 @@ class GameUI {
 
         let html = '';
         if (isMatchOver) {
-            html = `<h2>🏆 Match Results 🏆</h2>`;
-            html += `<h3 style="color:#a0a0a0; margin-bottom:15px">Final Totals after 3 Games</h3>`;
+            const maxScore = Math.max(...this.totalScores);
+            const winnerIdx = this.totalScores.indexOf(maxScore);
+            html = `<h3>Match Complete</h3>`;
+            html += `<h2>${playerNames[winnerIdx]} ${winnerIdx === 0 ? 'win' : 'wins'} ✦</h2>`;
         } else {
-            html = `<h2>Round ${this.matchRound} Complete</h2>`;
-            html += `<h3 style="color:#a0a0a0; margin-bottom:15px">Next Round: Player ${['You', 'AI 1', 'AI 2'][this.matchRound]} starts</h3>`;
+            html = `<h3>Round ${this.matchRound} Complete</h3>`;
+            html += `<h2>Next: ${playerNames[this.matchRound]} leads</h2>`;
         }
 
-        html += '<div class="scores" style="text-align:left; display:inline-block; min-width:300px">';
-
-        html += '<div class="score-row" style="border-bottom:1px solid #444; margin-bottom:10px; font-size:14px; color:#aaa">' +
-            '<span style="display:inline-block; width:100px">Player</span>' +
-            '<span style="display:inline-block; width:80px">Round</span>' +
-            '<span style="display:inline-block; width:80px">Total</span></div>';
+        html += '<div class="scores">';
+        html += `<div class="score-table-row head">
+            <span>Player</span>
+            <span>Round ${this.matchRound}</span>
+            <span>Total</span>
+        </div>`;
 
         for (let i = 0; i < 3; i++) {
             const isWinner = isMatchOver && (i === this.totalScores.indexOf(Math.max(...this.totalScores)));
-            const style = isWinner ? 'color:#4ade80; font-weight:bold' : '';
-            const crown = isWinner ? ' 👑' : '';
-
-            html += `<div class="score-row" style="${style}">
-                <span style="display:inline-block; width:100px">${playerNames[i]}</span>
-                <span style="display:inline-block; width:80px">${scores[i] > 0 ? '+' : ''}${scores[i]}</span>
-                <span style="display:inline-block; width:80px">${this.totalScores[i]}</span>
-                ${crown}
+            const winClass = isWinner ? ' winner' : '';
+            const mark = isWinner ? ' ✦' : '';
+            const fmt = (v) => v > 0 ? `+${v}` : `${v}`;
+            html += `<div class="score-table-row${winClass}">
+                <span>${playerNames[i]}${mark}</span>
+                <span class="v">${fmt(scores[i])}</span>
+                <span class="v">${fmt(this.totalScores[i])}</span>
             </div>`;
         }
         html += '</div>';
 
-        container.innerHTML = html + '<br><br>';
+        container.innerHTML = html;
 
         const actionBtn = document.createElement('button');
         actionBtn.className = 'btn';
-
         if (isMatchOver) {
             actionBtn.textContent = 'Back to Lobby';
-            actionBtn.addEventListener('click', () => this.showDifficultySelect());
-        } else {
-            actionBtn.textContent = 'Start Next Round';
             actionBtn.addEventListener('click', () => {
-                document.getElementById('loading').classList.remove('hidden');
+                this.matchRound = 0;
+                this.totalScores = [0, 0, 0];
+                this.roundScores = [];
+                this.showDifficultySelect();
+            });
+        } else {
+            actionBtn.textContent = 'Next Round';
+            actionBtn.addEventListener('click', () => {
                 document.getElementById('game-over').classList.add('hidden');
-                setTimeout(() => this.startRound(), 500);
+                document.getElementById('loading').classList.remove('hidden');
+                setTimeout(() => this.startRound(), 400);
             });
         }
         container.appendChild(actionBtn);
     }
 }
 
-// Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     const ui = new GameUI();
     ui.init();

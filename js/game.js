@@ -334,10 +334,10 @@ class WizardExtremeGame {
     }
 
     _calculateScores() {
-        // -3 per remaining seal, -3 per black seal, -4 per joker seal
+        // -2 per remaining seal, -3 per black seal, -4 per joker seal
         return this.players.map(p => {
             const leftoverSeals = Object.values(p.seals).reduce((a, b) => a + b, 0);
-            return -(leftoverSeals * 3 + p.blackSeals * 3 + p.jokerSeals * 4);
+            return -(leftoverSeals * 2 + p.blackSeals * 3 + p.jokerSeals * 4);
         });
     }
 

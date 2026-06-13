@@ -7,7 +7,7 @@ const ACTION_DIM_AI = 67;
 class WizardAI {
     constructor() {
         this.session = null;
-        this.difficulty = 'medium';
+        this.difficulty = 'easy';
         this.modelLoaded = false;
     }
 

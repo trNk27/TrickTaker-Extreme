@@ -11,8 +11,8 @@ class GameUI {
         this.matchRound = 0;
         this.totalScores = [0, 0, 0];
         this.roundScores = []; // array of [s0,s1,s2] per completed round
-        this.ai1Difficulty = 'medium';
-        this.ai2Difficulty = 'medium';
+        this.ai1Difficulty = 'easy';
+        this.ai2Difficulty = 'hard';
     }
 
     async init() {

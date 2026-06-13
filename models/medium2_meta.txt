@@ -1,2 +1,0 @@
-input_dim=373
-action_dim=67

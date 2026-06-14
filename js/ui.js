@@ -21,6 +21,20 @@ class GameUI {
         // match after only 2 rounds. Set while a move is resolving, cleared when
         // control returns to the human.
         this.busy = false;
+
+        // Single handle for the next scheduled step. The whole game is one turn
+        // loop; we never want two pending timers. (Bidding seal-takes keep the
+        // human's turn but used to each schedule a processNextTurn — taking
+        // several within 500ms stacked timers that later launched parallel loops,
+        // which stepped a play action into the DISCARDING phase and produced a
+        // spurious black seal.) Every schedule clears the previous one.
+        this.nextTimer = null;
+    }
+
+    // Schedule the single next step, replacing any pending one (enforces one loop).
+    scheduleNext(fn, delay) {
+        clearTimeout(this.nextTimer);
+        this.nextTimer = setTimeout(fn, delay);
     }
 
     async init() {
@@ -95,6 +109,7 @@ class GameUI {
         this.game.reset();
         this.gameStarted = true;
         this.busy = false; // fresh round: a single turn loop starts below
+        clearTimeout(this.nextTimer);
 
         this.render();
         this.processNextTurn();
@@ -107,6 +122,7 @@ class GameUI {
         document.getElementById('game-over').classList.add('hidden');
         this.gameStarted = false;
         this.busy = false;
+        clearTimeout(this.nextTimer);
     }
 
     render() {
@@ -462,18 +478,20 @@ class GameUI {
             this.busy = true; // lock input until the deferred step resolves
             const cardId = action - 16;
             this.showThirdCard(cardId, this.game.currentPlayerIdx);
-            setTimeout(() => {
-                const result = this.game.step(action);
-                this.render();
-                if (result.done) this.handleRoundOver(result.info.scores);
-                else setTimeout(() => this.processNextTurn(), 500);
-            }, 2000);
+            this.scheduleNext(() => this.resolveStep(action), 2000);
         } else {
-            const result = this.game.step(action);
-            this.render();
-            if (result.done) this.handleRoundOver(result.info.scores);
-            else setTimeout(() => this.processNextTurn(), 500);
+            this.resolveStep(action);
         }
+    }
+
+    // Apply one action, render, then either end the round or schedule the next
+    // turn. Always reached through the single nextTimer, so only one loop runs.
+    resolveStep(action) {
+        if (!this.gameStarted) return; // a stale timer fired after the round ended
+        const result = this.game.step(action);
+        this.render();
+        if (result.done) this.handleRoundOver(result.info.scores);
+        else this.scheduleNext(() => this.processNextTurn(), 500);
     }
 
     showThirdCard(cardId, playerIdx) {
@@ -506,26 +524,21 @@ class GameUI {
             this.game.currentTrick.length === 2 &&
             action >= 16 && action <= 60;
 
+        if (!this.gameStarted) return; // round may have ended during the awaits
+
         if (trickWillComplete) {
-            const cardId = action - 16;
-            this.showThirdCard(cardId, currentPlayer);
-            setTimeout(() => {
-                const result = this.game.step(action);
-                this.render();
-                if (result.done) this.handleRoundOver(result.info.scores);
-                else setTimeout(() => this.processNextTurn(), 500);
-            }, 2000);
+            this.showThirdCard(action - 16, currentPlayer);
+            this.scheduleNext(() => this.resolveStep(action), 2000);
         } else {
-            const result = this.game.step(action);
-            this.render();
-            if (result.done) this.handleRoundOver(result.info.scores);
-            else setTimeout(() => this.processNextTurn(), 500);
+            this.resolveStep(action);
         }
     }
 
     handleRoundOver(scores) {
+        if (!this.gameStarted) return; // ignore a duplicate round-end
         this.gameStarted = false;
         this.busy = false;
+        clearTimeout(this.nextTimer);
         this.roundScores.push(scores);
         for (let i = 0; i < 3; i++) this.totalScores[i] += scores[i];
         this.matchRound++;

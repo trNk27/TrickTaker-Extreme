@@ -73,6 +73,19 @@ class GameUI {
         });
     }
 
+    // 'crusher1-pimc10' → { model: 'crusher1', pimc: 10 }
+    // 'crusher1'        → { model: 'crusher1', pimc: null }
+    parseDifficulty(value) {
+        const m = value.match(/^(.+)-pimc(\d+)$/);
+        return m ? { model: m[1], pimc: parseInt(m[2]) } : { model: value, pimc: null };
+    }
+
+    displayName(difficulty) {
+        const { model, pimc } = this.parseDifficulty(difficulty);
+        const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+        return pimc !== null ? `${cap(model)} · PIMC K=${pimc}` : cap(model);
+    }
+
     async startMatch() {
         if (this.busy) return; // ignore repeat taps during model load
         this.busy = true;
@@ -82,8 +95,8 @@ class GameUI {
         document.getElementById('difficulty-select').classList.add('hidden');
         document.getElementById('loading').classList.remove('hidden');
 
-        await this.ai[0].loadModel(this.ai1Difficulty);
-        await this.ai[1].loadModel(this.ai2Difficulty);
+        await this.ai[0].loadModel(this.parseDifficulty(this.ai1Difficulty).model);
+        await this.ai[1].loadModel(this.parseDifficulty(this.ai2Difficulty).model);
 
         this.matchRound = 0;
         this.totalScores = [0, 0, 0];
@@ -99,11 +112,10 @@ class GameUI {
         document.getElementById('game-over').classList.add('hidden');
 
         // Set opponent labels
-        const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
         document.getElementById('opponent-1-name').textContent = 'AI 1';
-        document.getElementById('opponent-1-meta').textContent = cap(this.ai1Difficulty);
+        document.getElementById('opponent-1-meta').textContent = this.displayName(this.ai1Difficulty);
         document.getElementById('opponent-2-name').textContent = 'AI 2';
-        document.getElementById('opponent-2-meta').textContent = cap(this.ai2Difficulty);
+        document.getElementById('opponent-2-meta').textContent = this.displayName(this.ai2Difficulty);
 
         this.game.startingPlayerOffset = this.matchRound;
         this.game.reset();
@@ -514,11 +526,26 @@ class GameUI {
         }
 
         const aiIndex = currentPlayer - 1;
-        const state = this.game.getState(currentPlayer);
-        const mask = this.game.getLegalActions(currentPlayer);
-        const action = await this.ai[aiIndex].getAction(state, mask);
+        const difficulty = aiIndex === 0 ? this.ai1Difficulty : this.ai2Difficulty;
+        const { model, pimc } = this.parseDifficulty(difficulty);
 
-        await new Promise(resolve => setTimeout(resolve, 300));
+        let action;
+        if (pimc !== null) {
+            document.getElementById('status-text').textContent = 'Thinking…';
+            try {
+                action = await fetchPimcMove(this.game, currentPlayer, pimc, model);
+            } catch (e) {
+                console.warn('PIMC fetch failed, falling back to greedy:', e);
+                const state = this.game.getState(currentPlayer);
+                const mask = this.game.getLegalActions(currentPlayer);
+                action = await this.ai[aiIndex].getAction(state, mask);
+            }
+        } else {
+            const state = this.game.getState(currentPlayer);
+            const mask = this.game.getLegalActions(currentPlayer);
+            await new Promise(resolve => setTimeout(resolve, 300));
+            action = await this.ai[aiIndex].getAction(state, mask);
+        }
 
         const trickWillComplete = this.game.phase === 'PLAYING' &&
             this.game.currentTrick.length === 2 &&

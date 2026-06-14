@@ -10,7 +10,14 @@ client already holds every hand (it is a client-side PvE simulation), and PIMC
 re-samples the opponents' cards anyway, so the server never "cheats".
 """
 import json
+import os
+import sys
 from http.server import BaseHTTPRequestHandler
+
+# Vercel imports this module with /var/task on sys.path but NOT the function's
+# own directory, so a bare `import pimc_core` (a sibling file) fails with
+# ModuleNotFoundError. Put this file's directory on the path first.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import pimc_core
 

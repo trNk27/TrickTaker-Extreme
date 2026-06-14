@@ -880,3 +880,126 @@ body::before {
     margin-bottom: 2px;
     letter-spacing: 0.02em;
 }
+
+/* =====================================================================
+   Mobile / phone layout
+   The desktop layout uses fixed widths (.opponent 240px, #trick-area
+   320px) that overflow a phone viewport and force the browser to zoom
+   out. Below ~640px we relax those, shrink the table chrome, turn the
+   player's 15-card hand into a horizontally-scrollable row of full-size
+   tap targets, and enlarge the action buttons into colored chips.
+   ===================================================================== */
+@media (max-width: 640px) {
+    .screen { padding: 12px; }
+
+    /* Header: compact, wrap status under the brand if needed */
+    .game-header { padding: 4px 2px 10px; margin-bottom: 12px; flex-wrap: wrap; gap: 6px 10px; }
+    .brand { gap: 8px; }
+    .brand-rune { width: 22px; height: 22px; font-size: 11px; }
+    .brand-name { font-size: 18px; }
+    .status { font-size: 10px; letter-spacing: 0.08em; gap: 8px; order: 3; flex-basis: 100%; }
+    .rules-btn { width: 32px; height: 32px; font-size: 16px; }
+
+    .game-main { gap: 12px; }
+
+    /* Table chrome */
+    .table { padding: 12px; min-height: 0; border-radius: 16px; }
+    .table::before { inset: 8px; }
+
+    /* Opponents: flexible instead of fixed 240px each */
+    .opponents-row { gap: 10px; margin-bottom: 6px; }
+    .opponent { flex: 1 1 0; min-width: 0; }
+    .opponent-name { font-size: 14px; }
+    .opponent-meta { font-size: 9px; letter-spacing: 0.14em; margin-bottom: 6px; }
+    .opponent-hand { height: 44px; }
+    .card-back { width: 26px; height: 38px; margin-left: -15px; }
+    .card-back::before { font-size: 10px; }
+    .opponent-seals { margin-top: 8px; min-height: 22px; gap: 4px; }
+
+    /* Trick area: responsive width (was fixed 320px) */
+    #trick-area { width: 100%; max-width: 300px; height: 160px; margin: 8px auto; }
+
+    /* Cards */
+    .card { width: 50px; height: 72px; padding: 3px 4px; border-radius: 5px; }
+    .card-corner { font-size: 12px; }
+    .card-corner-suit { font-size: 9px; }
+
+    /* Player area */
+    .player-area { padding: 14px 12px; }
+    .player-header { margin-bottom: 10px; }
+    .player-name { font-size: 15px; }
+
+    /* Hand: single scrollable row, each card a real tap target.
+       (overflow-x makes the box clip vertically, so we pad the top to
+       keep the raised "playable" card from being cut off.) */
+    #player-hand {
+        flex-wrap: nowrap;
+        justify-content: flex-start;
+        overflow-x: auto;
+        overflow-y: hidden;
+        gap: 5px;
+        padding: 12px 2px 14px;
+        -webkit-overflow-scrolling: touch;
+        scroll-snap-type: x proximity;
+        scrollbar-width: thin;
+    }
+    #player-hand .card { flex: 0 0 auto; scroll-snap-align: center; }
+    .card.playable { outline-width: 2px; }
+    .card.playable:hover { transform: translateY(-6px); }
+
+    /* Seals a touch smaller so rows fit */
+    .seal { width: 22px; height: 22px; }
+    .seal-group .seal { margin-left: -12px; }
+
+    /* Action buttons -> large colored chips */
+    .action-panel { padding: 12px 10px; margin-top: 12px; }
+    .action-label { font-size: 13px; margin-bottom: 8px; }
+    .action-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+    .bid-btn, .steal-btn, .discard-btn {
+        min-height: 48px;
+        padding: 12px 8px;
+        font-size: 13px;
+        letter-spacing: 0.08em;
+        border-width: 1.5px;
+        background: rgba(255, 255, 255, 0.03);
+    }
+    /* Default (touch) color fills so each choice reads as its seal color */
+    .bid-btn[data-action="0"], .discard-btn[data-action="61"], .steal-btn[data-action="6"], .steal-btn[data-action="7"] { background: rgba(217,100,80,0.18); }
+    .bid-btn[data-action="1"], .discard-btn[data-action="62"], .steal-btn[data-action="8"], .steal-btn[data-action="9"] { background: rgba(96,136,200,0.18); }
+    .bid-btn[data-action="2"], .discard-btn[data-action="63"], .steal-btn[data-action="10"], .steal-btn[data-action="11"] { background: rgba(212,176,72,0.18); }
+    .bid-btn[data-action="3"], .discard-btn[data-action="64"], .steal-btn[data-action="12"], .steal-btn[data-action="13"] { background: rgba(107,168,94,0.18); }
+    .bid-btn[data-action="4"], .discard-btn[data-action="65"], .steal-btn[data-action="14"], .steal-btn[data-action="15"] { background: rgba(168,120,192,0.18); }
+    .joker-btn { background: rgba(232,200,120,0.16); }
+    .bid-btn.pass { grid-column: span 3; background: rgba(255,255,255,0.04); }
+
+    .steal-grid { gap: 10px; max-width: 100%; }
+    .steal-col { gap: 8px; }
+
+    .btn, .start-btn { padding: 14px 28px; min-height: 48px; }
+
+    /* Lobby */
+    .lobby-card { padding: 28px 18px; }
+    .lobby-mark { width: 38px; height: 38px; margin-bottom: 14px; }
+    .lobby-card h1 { font-size: 32px; }
+    .lobby-sub { margin-bottom: 22px; }
+    .lobby-card h2 { font-size: 16px; margin-bottom: 16px; }
+    .lobby { gap: 12px; margin-bottom: 24px; }
+    .opponent-select { padding: 16px 16px; min-width: 130px; }
+    .difficulty-dropdown { padding: 11px 14px; font-size: 14px; min-height: 44px; }
+
+    /* Sidebar panels */
+    .panel { padding: 14px 14px; }
+}
+
+/* Very small phones: shrink cards a bit more so several show at once */
+@media (max-width: 380px) {
+    .card { width: 44px; height: 64px; }
+    .card-back { width: 23px; height: 34px; margin-left: -14px; }
+    #trick-area { max-width: 270px; height: 150px; }
+    .opponent-select { min-width: 112px; padding: 14px 12px; }
+    .bid-btn, .steal-btn, .discard-btn { font-size: 12px; letter-spacing: 0.04em; }
+}

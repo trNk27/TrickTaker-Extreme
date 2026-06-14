@@ -13,6 +13,14 @@ class GameUI {
         this.roundScores = []; // array of [s0,s1,s2] per completed round
         this.ai1Difficulty = 'casio2';
         this.ai2Difficulty = 'crusher1';
+
+        // Re-entrancy lock. A match is exactly 3 full rounds (one per seat). The
+        // trick-completing play defers game.step() behind a 2s reveal; a second
+        // input during that window would spawn a parallel turn loop and fire
+        // handleRoundOver twice, jumping matchRound past a round and ending the
+        // match after only 2 rounds. Set while a move is resolving, cleared when
+        // control returns to the human.
+        this.busy = false;
     }
 
     async init() {
@@ -52,6 +60,8 @@ class GameUI {
     }
 
     async startMatch() {
+        if (this.busy) return; // ignore repeat taps during model load
+        this.busy = true;
         this.ai1Difficulty = document.getElementById('ai1-difficulty').value;
         this.ai2Difficulty = document.getElementById('ai2-difficulty').value;
 
@@ -84,6 +94,7 @@ class GameUI {
         this.game.startingPlayerOffset = this.matchRound;
         this.game.reset();
         this.gameStarted = true;
+        this.busy = false; // fresh round: a single turn loop starts below
 
         this.render();
         this.processNextTurn();
@@ -95,6 +106,7 @@ class GameUI {
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('game-over').classList.add('hidden');
         this.gameStarted = false;
+        this.busy = false;
     }
 
     render() {
@@ -414,6 +426,7 @@ class GameUI {
 
     // ---------- Interaction ----------
     handleCardClick(card) {
+        if (this.busy) return;
         if (this.game.phase !== 'PLAYING') return;
         if (this.game.currentPlayerIdx !== this.humanPlayer) return;
         const action = card.id + 16;
@@ -423,6 +436,7 @@ class GameUI {
     }
 
     handleBid(action) {
+        if (this.busy) return;
         if (this.game.phase !== 'BIDDING') return;
         if (this.game.currentPlayerIdx !== this.humanPlayer) return;
         const legalMask = this.game.getLegalActions(this.humanPlayer);
@@ -431,6 +445,7 @@ class GameUI {
     }
 
     handleDiscard(action) {
+        if (this.busy) return;
         if (this.game.phase !== 'DISCARDING') return;
         if (this.game.currentPlayerIdx !== this.humanPlayer) return;
         const legalMask = this.game.getLegalActions(this.humanPlayer);
@@ -444,6 +459,7 @@ class GameUI {
             action >= 16 && action <= 60;
 
         if (trickWillComplete) {
+            this.busy = true; // lock input until the deferred step resolves
             const cardId = action - 16;
             this.showThirdCard(cardId, this.game.currentPlayerIdx);
             setTimeout(() => {
@@ -474,7 +490,10 @@ class GameUI {
     async processNextTurn() {
         if (!this.gameStarted) return;
         const currentPlayer = this.game.currentPlayerIdx;
-        if (currentPlayer === this.humanPlayer) return;
+        if (currentPlayer === this.humanPlayer) {
+            this.busy = false; // hand control back to the human
+            return;
+        }
 
         const aiIndex = currentPlayer - 1;
         const state = this.game.getState(currentPlayer);
@@ -506,6 +525,7 @@ class GameUI {
 
     handleRoundOver(scores) {
         this.gameStarted = false;
+        this.busy = false;
         this.roundScores.push(scores);
         for (let i = 0; i < 3; i++) this.totalScores[i] += scores[i];
         this.matchRound++;
@@ -557,6 +577,8 @@ class GameUI {
         if (isMatchOver) {
             actionBtn.textContent = 'Back to Lobby';
             actionBtn.addEventListener('click', () => {
+                if (actionBtn.disabled) return;
+                actionBtn.disabled = true; // ignore repeat taps
                 this.matchRound = 0;
                 this.totalScores = [0, 0, 0];
                 this.roundScores = [];
@@ -565,6 +587,8 @@ class GameUI {
         } else {
             actionBtn.textContent = 'Next Round';
             actionBtn.addEventListener('click', () => {
+                if (actionBtn.disabled) return;
+                actionBtn.disabled = true; // ignore repeat taps -> only one startRound
                 document.getElementById('game-over').classList.add('hidden');
                 document.getElementById('loading').classList.remove('hidden');
                 setTimeout(() => this.startRound(), 400);

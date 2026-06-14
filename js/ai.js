@@ -65,8 +65,9 @@ class WizardAI {
             console.log(`AI Decision - Legal: [${legalActions.map(a => a <= 5 ? actionNames[a] : `A${a}`).join(', ')}]`);
             console.log(`  Probs: ${legalActions.map(a => `${a <= 5 ? actionNames[a] : a}:${(probs[a] * 100).toFixed(1)}%`).join(', ')}`);
 
-            // Sample action
-            const action = this.sampleAction(probs, legalActionsMask);
+            // Pick the highest-probability legal action (argmax / greedy play).
+            // The model plays noticeably stronger than sampling from the dist.
+            const action = this.argmaxAction(probs, legalActionsMask);
             console.log(`  Chosen: ${action <= 5 ? actionNames[action] : action}`);
 
             return action;
@@ -86,6 +87,19 @@ class WizardAI {
         const sumExp = expVals.reduce((a, b) => a + b, 0);
 
         return expVals.map(e => e / sumExp);
+    }
+
+    argmaxAction(probs, mask) {
+        // Greedy: highest-probability legal action.
+        let best = -1;
+        let bestProb = -Infinity;
+        for (let i = 0; i < mask.length; i++) {
+            if (mask[i] && probs[i] > bestProb) {
+                bestProb = probs[i];
+                best = i;
+            }
+        }
+        return best === -1 ? 0 : best;
     }
 
     sampleAction(probs, mask) {

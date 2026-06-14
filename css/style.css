@@ -387,17 +387,17 @@ body::before {
     box-shadow: 0 12px 22px rgba(232, 200, 120, 0.3);
 }
 .card-corner {
-    font-size: 13px;
+    font-size: 18px;
     line-height: 1;
-    font-weight: 600;
+    font-weight: 700;
     display: flex;
     flex-direction: column;
     align-items: center;
 }
 .card-corner.br { transform: rotate(180deg); }
 .card-corner-suit {
-    font-size: 9px;
-    margin-top: 1px;
+    font-size: 11px;
+    margin-top: 2px;
 }
 .card-center {
     position: absolute;
@@ -409,17 +409,19 @@ body::before {
     display: grid; place-items: center;
 }
 
-.card-color-0 { color: #6b1818; }
-.card-color-1 { color: #1c3a6e; }
-.card-color-2 { color: #8a6a14; }
-.card-color-3 { color: #1f5a2f; }
-.card-color-4 { color: #5a2470; }
+/* Cards are filled with their suit colour; rank + symbol are white (or dark
+   on the light yellow) for contrast. */
+.card-color-0 { background: linear-gradient(160deg, #e0715c 0%, #a82c1c 100%); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.45); }
+.card-color-1 { background: linear-gradient(160deg, #6f9bdb 0%, #2f4f86 100%); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.45); }
+.card-color-2 { background: linear-gradient(160deg, #f2dd8a 0%, #cda22c 100%); color: #4a3800; text-shadow: 0 1px 1px rgba(255,255,255,0.4); }
+.card-color-3 { background: linear-gradient(160deg, #7cc06b 0%, #357a2d 100%); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.45); }
+.card-color-4 { background: linear-gradient(160deg, #bb93d4 0%, #5f3380 100%); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.45); }
+/* Trump (red) keeps the red fill, marked by a gold inner border + warm glow. */
 .card-color-0.trump {
-    background: linear-gradient(160deg, #fbe4d4 0%, #f0c4a4 100%);
     box-shadow:
         0 2px 4px rgba(0,0,0,0.4),
-        0 6px 18px rgba(220,80,40,0.3),
-        inset 0 0 0 1px rgba(220,80,40,0.4);
+        0 6px 18px rgba(220,80,40,0.45),
+        inset 0 0 0 2px rgba(255,210,120,0.6);
 }
 
 /* ------- Pool ------- */
@@ -921,29 +923,26 @@ body::before {
 
     /* Cards */
     .card { width: 50px; height: 72px; padding: 3px 4px; border-radius: 5px; }
-    .card-corner { font-size: 12px; }
-    .card-corner-suit { font-size: 9px; }
+    .card-corner { font-size: 15px; }
+    .card-corner-suit { font-size: 10px; }
 
     /* Player area */
     .player-area { padding: 14px 12px; }
     .player-header { margin-bottom: 10px; }
     .player-name { font-size: 15px; }
 
-    /* Hand: single scrollable row, each card a real tap target.
-       (overflow-x makes the box clip vertically, so we pad the top to
-       keep the raised "playable" card from being cut off.) */
+    /* Hand: a fixed 5-column grid (so 15 cards = 3 rows of 5). A single row
+       grew the page width and forced the user to zoom out; a 5-wide grid is
+       always bounded to the viewport and each card stays a full tap target. */
     #player-hand {
-        flex-wrap: nowrap;
-        justify-content: flex-start;
-        overflow-x: auto;
-        overflow-y: hidden;
-        gap: 5px;
-        padding: 12px 2px 14px;
-        -webkit-overflow-scrolling: touch;
-        scroll-snap-type: x proximity;
-        scrollbar-width: thin;
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        justify-items: center;
+        gap: 8px 4px;
+        padding: 8px 2px 4px;
+        overflow: visible;
     }
-    #player-hand .card { flex: 0 0 auto; scroll-snap-align: center; }
+    #player-hand .card { flex: none; }
     .card.playable { outline-width: 2px; }
     .card.playable:hover { transform: translateY(-6px); }
 

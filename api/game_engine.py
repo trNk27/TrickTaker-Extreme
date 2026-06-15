@@ -91,7 +91,11 @@ class WizardExtremeGame:
         self.pending_trick_result_type = None # "RED_WIN", "JOKER_WIN"
         self.pending_lead_color = None
         self.pending_win_card = None
-        
+
+        # Most recently completed trick, for the online client's 2s reveal:
+        # {"cards": [[seat, cardId] x3], "winner": seat}. Server-only; PIMC ignores it.
+        self.last_completed_trick = None
+
     def reset(self):
         cards = []
         for c in range(NUM_COLORS):
@@ -180,7 +184,14 @@ class WizardExtremeGame:
                         # Trick complete, resolve winner
                         lead_color = self.current_trick[0][1].color
                         winner_idx, win_card = self._resolve_trick()
-                        
+
+                        # Snapshot the just-completed 3-card trick so the online
+                        # client can keep it on screen for ~2s before it clears.
+                        self.last_completed_trick = {
+                            "cards": [[pi, c.id] for pi, c in self.current_trick],
+                            "winner": int(winner_idx),
+                        }
+
                         # Check for Decision State
                         decision_needed = self._check_decision_needed(winner_idx, win_card, lead_color)
                         

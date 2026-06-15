@@ -68,6 +68,7 @@ def deserialize(st):
     g.pending_lead_color = st.get("pendingLeadColor")
     pwc = st.get("pendingWinCard")
     g.pending_win_card = card_from_id(int(pwc)) if pwc is not None else None
+    g.last_completed_trick = st.get("lastCompletedTrick")
 
     for i, pj in enumerate(st["players"]):
         p = g.players[i]
@@ -95,6 +96,7 @@ def serialize(g):
         "pendingLeadColor": g.pending_lead_color,
         "pendingWinCard": (int(g.pending_win_card.id)
                            if getattr(g, "pending_win_card", None) is not None else None),
+        "lastCompletedTrick": getattr(g, "last_completed_trick", None),
         "players": [{
             "hand": [int(c.id) for c in p.hand],
             "seals": [int(p.seals[c]) for c in range(5)],

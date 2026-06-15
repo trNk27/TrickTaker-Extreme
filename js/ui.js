@@ -761,6 +761,9 @@ class GameUI {
         this.gameStarted = true;
         this.busy = true;
         this.online.polling = true;
+        this.online.lastTrickKey = undefined; // set on first view; no reveal on (re)join
+        this.online.revealUntil = 0;
+        this._pendingView = null;
         this.pollGame();
     }
 
@@ -789,6 +792,14 @@ class GameUI {
     }
 
     applyView(view) {
+        // Always remember the freshest view; while a trick reveal is on screen we
+        // defer rendering it until the 2s window ends.
+        this._pendingView = view;
+        if (this.online.revealUntil && Date.now() < this.online.revealUntil) return;
+        this.renderView(view);
+    }
+
+    renderView(view) {
         this.online.version = view.version;
         this.humanPlayer = view.yourSeat;
         this.matchRound = view.matchRound;
@@ -805,6 +816,21 @@ class GameUI {
             if (metaEl) metaEl.textContent = p.type === 'ai' ? 'Crusher · K=10' : 'Player';
         }
 
+        // Completed-trick reveal: hold the just-finished 3-card trick on screen for
+        // 2s before the next state clears it (matches single-player). A mid-round
+        // trick never coincides with a round-end view (roundScores), so these two
+        // paths don't collide.
+        const key = view.lastTrick ? `${view.matchRound}:${view.tricksPlayed}` : null;
+        if (this.online.lastTrickKey === undefined) {
+            this.online.lastTrickKey = key;            // first view after (re)join — no reveal
+        } else if (view.lastTrick && key !== this.online.lastTrickKey) {
+            this.online.lastTrickKey = key;
+            this.revealTrick(view);
+            return;
+        } else {
+            this.online.lastTrickKey = key;
+        }
+
         // Capture a finished round exactly once (a round can't complete twice
         // between polls, so we never miss one).
         if (view.roundScores) {
@@ -818,6 +844,22 @@ class GameUI {
         this.busy = !view.yourTurn;
         this.render();
         if (view.status === 'done') { this.online.polling = false; this.onlineMatchOver(); }
+    }
+
+    // Show the completed trick's three cards for 2s, then render the latest view.
+    revealTrick(view) {
+        this.game.currentTrick = view.lastTrick.cards.map(([seat, cid]) =>
+            ({ playerIdx: seat, card: new Card(Math.floor(cid / 9), (cid % 9) + 1) }));
+        this.busy = true;            // no input while the trick is on screen
+        this.render();
+        this.online.revealUntil = Date.now() + 2000;
+        clearTimeout(this._revealTimer);
+        this._revealTimer = setTimeout(() => {
+            this.online.revealUntil = 0;
+            if (this.mode === 'online' && this.online.polling !== false) {
+                this.renderView(this._pendingView);
+            }
+        }, 2000);
     }
 
     // ---- Online lobby / waiting / overlays ----

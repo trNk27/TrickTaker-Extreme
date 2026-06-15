@@ -129,6 +129,7 @@ def build_view(game, seats, total_scores, match_round, status, version, seat,
         "pendingLeadColor": game.pending_lead_color,
         "pendingWinCard": (int(game.pending_win_card.id)
                            if getattr(game, "pending_win_card", None) is not None else None),
+        "lastTrick": getattr(game, "last_completed_trick", None),
         "colorNames": COLOR_NAMES,
         "roundScores": ([int(s) for s in round_scores] if round_scores else None),
     }

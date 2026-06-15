@@ -142,6 +142,20 @@ def rollout(session, clone):
     return info["scores"]
 
 
+def relative_score(scores, p):
+    """Margin of player p over the average of the other players.
+
+    The game is won by ordinal standing (closest to 0 of three), not by absolute
+    penalty, so the search optimises own-minus-mean rather than own score alone.
+    This keeps p ahead and -- crucially -- punishes letting an opponent escape
+    cheaply: it defends against a human who deliberately drops one seal to dump
+    losing tricks (and black seals) onto the AI. For 3 players these margins sum
+    to 0, so the objective stays zero-sum.
+    """
+    others = [s for i, s in enumerate(scores) if i != p]
+    return scores[p] - sum(others) / len(others)
+
+
 def pimc_action(session, game, p, K):
     mask = game.get_legal_actions(p)
     legal_plays = [a for a in range(16, 61) if mask[a]]
@@ -155,7 +169,7 @@ def pimc_action(session, game, p, K):
         for a in legal_plays:
             c = copy.deepcopy(w)
             c.step(a)
-            values[a] += rollout(session, c)[p]
+            values[a] += relative_score(rollout(session, c), p)
     return max(legal_plays, key=lambda a: values[a])
 
 

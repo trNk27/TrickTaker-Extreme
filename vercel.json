@@ -4,6 +4,22 @@
     "api/pimc-move.py": {
       "maxDuration": 30,
       "includeFiles": "models/**"
+    },
+    "api/queue-join.py": {
+      "maxDuration": 30,
+      "includeFiles": "models/**"
+    },
+    "api/queue-fill.py": {
+      "maxDuration": 30,
+      "includeFiles": "models/**"
+    },
+    "api/game-move.py": {
+      "maxDuration": 30,
+      "includeFiles": "models/**"
+    },
+    "api/game-state.py": {
+      "maxDuration": 30,
+      "includeFiles": "models/**"
     }
   }
 }

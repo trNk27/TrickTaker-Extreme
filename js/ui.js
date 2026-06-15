@@ -14,6 +14,15 @@ class GameUI {
         this.ai1Difficulty = 'casio2';
         this.ai2Difficulty = 'crusher1';
 
+        // Render methods are relative to humanPlayer + playerLabels so the same
+        // code serves local play (you = seat 0) and online play (you = any seat).
+        this.playerLabels = ['You', 'AI 1', 'AI 2'];
+
+        // Online multiplayer state (mode === 'online'); unused in local play.
+        this.mode = 'local';
+        this.online = { playerId: null, token: null, gameId: null,
+                        version: -1, polling: false, lastMatchRound: 0 };
+
         // Re-entrancy lock. A match is exactly 3 full rounds (one per seat). The
         // trick-completing play defers game.step() behind a 2s reveal; a second
         // input during that window would spawn a parallel turn loop and fire
@@ -40,10 +49,31 @@ class GameUI {
     async init() {
         this.setupEventListeners();
         this.showDifficultySelect();
+        this.tryResumeOnline();
+    }
+
+    // Rejoin an in-progress online game after a refresh; falls back to the lobby
+    // if the stored game is gone or finished.
+    tryResumeOnline() {
+        let saved;
+        try { saved = JSON.parse(localStorage.getItem('we_online') || 'null'); } catch { saved = null; }
+        if (!saved || !saved.gameId || !saved.playerId || !saved.token) return;
+        this.mode = 'online';
+        this.online.playerId = saved.playerId;
+        this.online.token = saved.token;
+        this.enterOnlineGame(saved.gameId);
     }
 
     setupEventListeners() {
         document.getElementById('start-game-btn')?.addEventListener('click', () => this.startMatch());
+
+        // Online multiplayer
+        document.getElementById('play-online-btn')?.addEventListener('click', () => this.startOnline());
+        document.getElementById('fill-ai-btn')?.addEventListener('click', () => this.fillWithAI());
+        document.getElementById('online-cancel-btn')?.addEventListener('click', () => {
+            localStorage.removeItem('we_online');
+            this.backToOnlineLobby();
+        });
 
         document.querySelectorAll('.bid-btn').forEach(btn => {
             btn.addEventListener('click', () => this.handleBid(parseInt(btn.dataset.action)));
@@ -206,11 +236,12 @@ class GameUI {
     }
 
     renderOpponents() {
-        for (let pIdx = 1; pIdx <= 2; pIdx++) {
-            const container = document.getElementById(`opponent-${pIdx}-hand`);
+        for (let slot = 1; slot <= 2; slot++) {
+            const absSeat = (this.humanPlayer + slot) % 3; // relative to you
+            const container = document.getElementById(`opponent-${slot}-hand`);
             container.innerHTML = '';
 
-            const player = this.game.players[pIdx];
+            const player = this.game.players[absSeat];
             const count = player.hand.length;
             const angleStep = 4;
             const startAngle = -((count - 1) * angleStep) / 2;
@@ -231,8 +262,9 @@ class GameUI {
         container.innerHTML = '<div class="trick-glow"></div>';
 
         for (const { playerIdx, card } of this.game.currentTrick) {
+            const relPos = (playerIdx - this.humanPlayer + 3) % 3; // you at the bottom
             const wrapper = document.createElement('div');
-            wrapper.className = `trick-card trick-pos-${playerIdx}`;
+            wrapper.className = `trick-card trick-pos-${relPos}`;
             wrapper.appendChild(this.createCardElement(card));
             container.appendChild(wrapper);
         }
@@ -324,10 +356,11 @@ class GameUI {
             poolContainer.classList.add('hidden');
         }
 
-        // Player + opponent seals
+        // Player + opponent seals (relative to your seat)
         for (let pIdx = 0; pIdx < 3; pIdx++) {
             const player = this.game.players[pIdx];
-            const containerId = pIdx === 0 ? 'player-seals' : `opponent-${pIdx}-seals`;
+            const slot = (pIdx - this.humanPlayer + 3) % 3; // 0 = you, 1/2 = opponents
+            const containerId = slot === 0 ? 'player-seals' : `opponent-${slot}-seals`;
             const container = document.getElementById(containerId);
             if (!container) continue;
             container.innerHTML = '';
@@ -376,11 +409,10 @@ class GameUI {
             'PLAYING': 'Playing',
             'DISCARDING': 'Choosing'
         }[this.game.phase] || this.game.phase;
-        const playerNames = ['Your', "AI 1's", "AI 2's"];
+        const possessive = (i) => this.playerLabels[i] === 'You'
+            ? 'Your' : `${this.playerLabels[i]}'s`;
         const trick = Math.min(this.game.tricksPlayed + 1, 15);
-        const turnText = this.game.phase === 'BIDDING'
-            ? `${playerNames[this.game.currentPlayerIdx]} turn`
-            : `${playerNames[this.game.currentPlayerIdx]} turn`;
+        const turnText = `${possessive(this.game.currentPlayerIdx)} turn`;
         document.getElementById('status-text').textContent =
             `${phaseLabel} · Trick ${trick}/15 · ${turnText}`;
     }
@@ -406,7 +438,7 @@ class GameUI {
         // Standings (running totals — sorted by score, you highlighted)
         const standings = document.getElementById('standings');
         standings.innerHTML = '';
-        const names = ['You', 'AI 1', 'AI 2'];
+        const names = this.playerLabels;
         const entries = [0, 1, 2].map(i => ({
             idx: i,
             name: names[i],
@@ -415,7 +447,7 @@ class GameUI {
         entries.sort((a, b) => b.total - a.total);
         entries.forEach((e, rank) => {
             const row = document.createElement('div');
-            row.className = 'score-row' + (e.idx === 0 ? ' you' : '');
+            row.className = 'score-row' + (e.idx === this.humanPlayer ? ' you' : '');
             const valClass = e.total > 0 ? 'pos' : (e.total < 0 ? 'neg' : '');
             row.innerHTML = `
                 <div class="score-name">
@@ -482,6 +514,7 @@ class GameUI {
     }
 
     playAction(action) {
+        if (this.mode === 'online') { this.submitOnlineMove(action); return; }
         const trickWillComplete = this.game.phase === 'PLAYING' &&
             this.game.currentTrick.length === 2 &&
             action >= 16 && action <= 60;
@@ -508,8 +541,9 @@ class GameUI {
 
     showThirdCard(cardId, playerIdx) {
         const container = document.getElementById('trick-area');
+        const relPos = (playerIdx - this.humanPlayer + 3) % 3;
         const wrapper = document.createElement('div');
-        wrapper.className = `trick-card trick-pos-${playerIdx}`;
+        wrapper.className = `trick-card trick-pos-${relPos}`;
         const color = Math.floor(cardId / 9);
         const value = (cardId % 9) + 1;
         const card = { id: cardId, color, value };
@@ -576,7 +610,7 @@ class GameUI {
         const container = document.getElementById('game-over');
         container.classList.remove('hidden');
 
-        const playerNames = ['You', 'AI 1', 'AI 2'];
+        const playerNames = this.playerLabels;
         const isMatchOver = this.matchRound >= 3;
 
         let html = '';
@@ -584,7 +618,7 @@ class GameUI {
             const maxScore = Math.max(...this.totalScores);
             const winnerIdx = this.totalScores.indexOf(maxScore);
             html = `<h3>Match Complete</h3>`;
-            html += `<h2>${playerNames[winnerIdx]} ${winnerIdx === 0 ? 'win' : 'wins'} ✦</h2>`;
+            html += `<h2>${playerNames[winnerIdx]} ${winnerIdx === this.humanPlayer ? 'win' : 'wins'} ✦</h2>`;
         } else {
             html = `<h3>Round ${this.matchRound} Complete</h3>`;
             html += `<h2>Next: ${playerNames[this.matchRound]} leads</h2>`;
@@ -635,6 +669,226 @@ class GameUI {
             });
         }
         container.appendChild(actionBtn);
+    }
+
+    // ===================== Online multiplayer =====================
+
+    // Build a client-side WizardExtremeGame view-model from the server's redacted
+    // view. Only your own hand is known; opponents are placeholder cards of the
+    // right count (rendered face-down). getLegalActions(you) is exact because it
+    // depends only on your hand + public state.
+    hydrateGame(view) {
+        const g = new WizardExtremeGame();
+        g.phase = view.phase;
+        g.tricksPlayed = view.tricksPlayed;
+        g.currentPlayerIdx = view.currentSeat;
+        g.poolSeals = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
+        for (let c = 0; c < 5; c++) g.poolSeals[c] = view.poolSeals[c];
+        g.jokerPool = view.jokerPool;
+        g.roundHistoryMask = new Array(TOTAL_CARDS).fill(0);
+        g.pendingLeadColor = view.pendingLeadColor;
+        g.pendingWinCard = (view.pendingWinCard !== null && view.pendingWinCard !== undefined)
+            ? new Card(Math.floor(view.pendingWinCard / 9), (view.pendingWinCard % 9) + 1)
+            : null;
+        g.currentTrick = view.currentTrick.map(([pi, cid]) =>
+            ({ playerIdx: pi, card: new Card(Math.floor(cid / 9), (cid % 9) + 1) }));
+
+        for (let i = 0; i < 3; i++) {
+            const pv = view.players[i];
+            const p = g.players[i];
+            for (let c = 0; c < 5; c++) { p.seals[c] = pv.seals[c]; p.initialSeals[c] = pv.initialSeals[c]; }
+            p.jokerSeals = pv.jokerSeals;
+            p.blackSeals = pv.blackSeals;
+            p.hasPassedBidding = pv.hasPassed;
+            if (i === view.yourSeat && pv.hand) {
+                p.hand = pv.hand.map(cid => new Card(Math.floor(cid / 9), (cid % 9) + 1));
+            } else {
+                // placeholder cards — only the count is rendered (face-down)
+                p.hand = Array.from({ length: pv.handCount }, () => new Card(0, 1));
+            }
+        }
+        this.game = g;
+    }
+
+    startOnline() {
+        const nick = (document.getElementById('online-nick')?.value || '').trim() || 'Player';
+        this.mode = 'online';
+        this.matchRound = 0;
+        this.totalScores = [0, 0, 0];
+        this.roundScores = [];
+        document.getElementById('difficulty-select').classList.add('hidden');
+        this.showWaiting('Joining…', false);
+        OnlineNet.joinQueue(nick).then(res => {
+            this.online.playerId = res.playerId;
+            this.online.token = res.token;
+            this.online.gameId = null;
+            localStorage.setItem('we_online', JSON.stringify(
+                { playerId: res.playerId, token: res.token }));
+            if (res.gameId) {
+                this.enterOnlineGame(res.gameId);
+            } else {
+                this.showWaiting('Waiting for players…', true);
+                this.pollQueue();
+            }
+        }).catch(e => this.showWaiting('Error: ' + e.message, false));
+    }
+
+    pollQueue() {
+        if (this.mode !== 'online' || this.online.gameId) return;
+        OnlineNet.queueStatus(this.online.playerId).then(s => {
+            if (this.online.gameId) return;
+            if (s.status === 'matched' && s.gameId) this.enterOnlineGame(s.gameId);
+            else setTimeout(() => this.pollQueue(), OnlineNet.POLL_INTERVAL_MS);
+        }).catch(() => setTimeout(() => this.pollQueue(), OnlineNet.POLL_INTERVAL_MS));
+    }
+
+    fillWithAI() {
+        OnlineNet.fillWithAI(this.online.playerId, this.online.token)
+            .then(res => { if (res.gameId) this.enterOnlineGame(res.gameId); })
+            .catch(e => this.showWaiting('Error: ' + e.message, true));
+    }
+
+    enterOnlineGame(gameId) {
+        this.online.gameId = gameId;
+        this.online.version = -1;
+        this.online.lastMatchRound = 0;
+        this.roundScores = [];
+        localStorage.setItem('we_online', JSON.stringify(
+            { playerId: this.online.playerId, token: this.online.token, gameId }));
+        this.hideWaiting();
+        document.getElementById('game-area').classList.remove('hidden');
+        document.getElementById('game-over').classList.add('hidden');
+        this.gameStarted = true;
+        this.busy = true;
+        this.online.polling = true;
+        this.pollGame();
+    }
+
+    pollGame() {
+        if (this.mode !== 'online' || !this.online.polling) return;
+        OnlineNet.getState(this.online.gameId, this.online.token, this.online.version)
+            .then(view => { if (view.changed !== false) this.applyView(view); })
+            .catch(e => {
+                if (/404|not found/i.test(e.message)) {
+                    this.online.polling = false;
+                    localStorage.removeItem('we_online');
+                    this.backToOnlineLobby();
+                }
+            })
+            .finally(() => {
+                if (this.online.polling) setTimeout(() => this.pollGame(), OnlineNet.POLL_INTERVAL_MS);
+            });
+    }
+
+    submitOnlineMove(action) {
+        if (this.busy) return;
+        this.busy = true; // lock until the move response arrives
+        OnlineNet.move(this.online.gameId, this.online.token, action)
+            .then(view => this.applyView(view))
+            .catch(e => { this.busy = false; console.warn('move rejected:', e.message); });
+    }
+
+    applyView(view) {
+        this.online.version = view.version;
+        this.humanPlayer = view.yourSeat;
+        this.matchRound = view.matchRound;
+        this.totalScores = view.totalScores;
+        this.playerLabels = view.players.map((p, i) => i === view.yourSeat ? 'You' : p.nickname);
+        this.hydrateGame(view);
+
+        for (let slot = 1; slot <= 2; slot++) {
+            const seat = (view.yourSeat + slot) % 3;
+            const p = view.players[seat];
+            const nameEl = document.getElementById(`opponent-${slot}-name`);
+            const metaEl = document.getElementById(`opponent-${slot}-meta`);
+            if (nameEl) nameEl.textContent = p.nickname;
+            if (metaEl) metaEl.textContent = p.type === 'ai' ? 'Crusher · K=10' : 'Player';
+        }
+
+        // Capture a finished round exactly once (a round can't complete twice
+        // between polls, so we never miss one).
+        if (view.roundScores) {
+            const completed = view.status === 'done' ? 3 : view.matchRound;
+            if (this.roundScores.length < completed) {
+                this.roundScores.push(view.roundScores);
+                if (view.status !== 'done') this.onlineRoundSummary(view.roundScores);
+            }
+        }
+
+        this.busy = !view.yourTurn;
+        this.render();
+        if (view.status === 'done') { this.online.polling = false; this.onlineMatchOver(); }
+    }
+
+    // ---- Online lobby / waiting / overlays ----
+    showWaiting(text, showFill) {
+        const wait = document.getElementById('online-wait');
+        document.getElementById('difficulty-select').classList.add('hidden');
+        document.getElementById('game-area').classList.add('hidden');
+        wait.classList.remove('hidden');
+        document.getElementById('online-wait-text').textContent = text;
+        document.getElementById('fill-ai-btn').classList.toggle('hidden', !showFill);
+    }
+
+    hideWaiting() {
+        document.getElementById('online-wait').classList.add('hidden');
+    }
+
+    backToOnlineLobby() {
+        this.mode = 'local';
+        this.online = { playerId: null, token: null, gameId: null,
+                        version: -1, polling: false, lastMatchRound: 0 };
+        this.gameStarted = false;
+        this.hideWaiting();
+        document.getElementById('game-over').classList.add('hidden');
+        this.showDifficultySelect();
+    }
+
+    onlineRoundSummary(scores) {
+        const container = document.getElementById('game-over');
+        container.classList.remove('hidden');
+        let html = `<h3>Round ${this.matchRound} Complete</h3>`;
+        html += `<h2>Round ${this.matchRound + 1} begins…</h2>`;
+        html += this.scoreTableHtml(scores);
+        container.innerHTML = html;
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.textContent = 'Continue';
+        btn.addEventListener('click', () => container.classList.add('hidden'));
+        container.appendChild(btn);
+    }
+
+    onlineMatchOver() {
+        const container = document.getElementById('game-over');
+        container.classList.remove('hidden');
+        const maxScore = Math.max(...this.totalScores);
+        const winnerIdx = this.totalScores.indexOf(maxScore);
+        let html = `<h3>Match Complete</h3>`;
+        html += `<h2>${this.playerLabels[winnerIdx]} ${winnerIdx === this.humanPlayer ? 'win' : 'wins'} ✦</h2>`;
+        html += this.scoreTableHtml(this.roundScores[this.roundScores.length - 1] || [0, 0, 0]);
+        container.innerHTML = html;
+        const btn = document.createElement('button');
+        btn.className = 'btn';
+        btn.textContent = 'Back to Lobby';
+        btn.addEventListener('click', () => {
+            localStorage.removeItem('we_online');
+            this.backToOnlineLobby();
+        });
+        container.appendChild(btn);
+    }
+
+    scoreTableHtml(roundScores) {
+        const fmt = (v) => v > 0 ? `+${v}` : `${v}`;
+        let html = '<div class="scores">';
+        html += `<div class="score-table-row head"><span>Player</span><span>Round</span><span>Total</span></div>`;
+        for (let i = 0; i < 3; i++) {
+            html += `<div class="score-table-row">
+                <span>${this.playerLabels[i]}</span>
+                <span class="v">${fmt(roundScores[i])}</span>
+                <span class="v">${fmt(this.totalScores[i])}</span>
+            </div>`;
+        }
+        return html + '</div>';
     }
 }
 

@@ -1,2 +1,3 @@
 numpy
 onnxruntime
+psycopg[binary]

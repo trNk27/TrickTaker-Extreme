@@ -4,7 +4,7 @@
 // for the redacted ego-centric view. See webapp/api/ for the backend.
 
 const OnlineNet = (() => {
-    const POLL_INTERVAL_MS = 1500;   // turn-based; keep >=1.5s to protect Neon compute-hours
+    const POLL_INTERVAL_MS = 1000;   // turn-based; 1s balances snappiness vs Neon compute-hours
     const API = '';                  // same origin (Vercel)
 
     async function post(path, body) {
@@ -39,5 +39,7 @@ const OnlineNet = (() => {
                 `&token=${encodeURIComponent(token)}&since=${since}`),
         // -> updated view
         move: (gameId, token, action) => post('/api/game-move', { gameId, token, action }),
+        // -> {ok:true}; ends + deletes the match for everyone
+        abandon: (gameId, token) => post('/api/game-abandon', { gameId, token }),
     };
 })();

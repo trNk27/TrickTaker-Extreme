@@ -74,6 +74,7 @@ class GameUI {
             localStorage.removeItem('we_online');
             this.backToOnlineLobby();
         });
+        document.getElementById('abandon-btn')?.addEventListener('click', () => this.abandonMatch());
 
         document.querySelectorAll('.bid-btn').forEach(btn => {
             btn.addEventListener('click', () => this.handleBid(parseInt(btn.dataset.action)));
@@ -162,6 +163,7 @@ class GameUI {
         document.getElementById('game-area').classList.add('hidden');
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('game-over').classList.add('hidden');
+        document.getElementById('abandon-btn')?.classList.add('hidden');
         this.gameStarted = false;
         this.busy = false;
         clearTimeout(this.nextTimer);
@@ -758,6 +760,7 @@ class GameUI {
         this.hideWaiting();
         document.getElementById('game-area').classList.remove('hidden');
         document.getElementById('game-over').classList.add('hidden');
+        document.getElementById('abandon-btn')?.classList.remove('hidden');
         this.gameStarted = true;
         this.busy = true;
         this.online.polling = true;
@@ -881,9 +884,25 @@ class GameUI {
         this.online = { playerId: null, token: null, gameId: null,
                         version: -1, polling: false, lastMatchRound: 0 };
         this.gameStarted = false;
+        clearTimeout(this._revealTimer);
         this.hideWaiting();
         document.getElementById('game-over').classList.add('hidden');
         this.showDifficultySelect();
+    }
+
+    // End + delete the match for everyone. Other players' next poll 404s and
+    // they're returned to the lobby (handled in pollGame).
+    abandonMatch() {
+        if (this.mode !== 'online' || !this.online.gameId) return;
+        if (!confirm('Abandon this match? It will end for all players.')) return;
+        const { gameId, token } = this.online;
+        this.online.polling = false;          // stop our polling immediately
+        OnlineNet.abandon(gameId, token)
+            .catch(e => console.warn('abandon:', e.message))
+            .finally(() => {
+                localStorage.removeItem('we_online');
+                this.backToOnlineLobby();
+            });
     }
 
     onlineRoundSummary(scores) {

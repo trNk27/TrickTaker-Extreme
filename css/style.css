@@ -310,6 +310,21 @@ body::before {
 }
 .rules-btn:hover { background: rgba(201, 160, 90, 0.15); transform: rotate(-8deg); }
 
+.abandon-btn {
+    padding: 7px 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(217, 100, 80, 0.5);
+    background: transparent;
+    color: var(--c-red);
+    font-family: var(--arc-sans);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.abandon-btn:hover { background: rgba(217, 100, 80, 0.14); }
+
 /* ------- Game grid ------- */
 .game-grid {
     display: grid;

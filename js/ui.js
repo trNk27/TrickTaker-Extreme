@@ -24,9 +24,11 @@ class GameUI {
         this.playerLabels = ['You', 'AI 1', 'AI 2'];
 
         // Online multiplayer state (mode === 'online'); unused in local play.
+        // `conn` is the live PartyKit game-room handle (see js/online.js).
         this.mode = 'local';
-        this.online = { playerId: null, token: null, gameId: null,
-                        version: -1, polling: false, lastMatchRound: 0 };
+        this.online = { conn: null, lobby: null, roomId: null, nick: 'Player',
+                        active: false, version: -1, lastTrickKey: undefined,
+                        revealUntil: 0, isHost: false };
 
         // Re-entrancy lock. A match is exactly 3 full rounds (one per seat). The
         // trick-completing play defers game.step() behind a 2s reveal; a second
@@ -62,23 +64,25 @@ class GameUI {
     tryResumeOnline() {
         let saved;
         try { saved = JSON.parse(localStorage.getItem('we_online') || 'null'); } catch { saved = null; }
-        if (!saved || !saved.gameId || !saved.playerId || !saved.token) return;
-        this.mode = 'online';
-        this.online.playerId = saved.playerId;
-        this.online.token = saved.token;
-        this.enterOnlineGame(saved.gameId);
+        if (!saved || !saved.roomId) return;
+        this.online.nick = saved.nick || 'Player';
+        this.enterOnlineGame(saved.roomId);
     }
 
     setupEventListeners() {
         document.getElementById('start-game-btn')?.addEventListener('click', () => this.startMatch());
 
         // Online multiplayer
-        document.getElementById('play-online-btn')?.addEventListener('click', () => this.startOnline());
-        document.getElementById('fill-ai-btn')?.addEventListener('click', () => this.fillWithAI());
-        document.getElementById('online-cancel-btn')?.addEventListener('click', () => {
-            localStorage.removeItem('we_online');
-            this.backToOnlineLobby();
+        document.getElementById('play-online-btn')?.addEventListener('click', () => this.startQuickMatch());
+        document.getElementById('create-room-btn')?.addEventListener('click', () => this.createRoom());
+        document.getElementById('join-room-btn')?.addEventListener('click', () => {
+            const code = (document.getElementById('join-code')?.value || '').trim().toLowerCase();
+            if (code) this.joinRoom(code);
         });
+        document.getElementById('fill-ai-btn')?.addEventListener('click', () => this.fillWithAI());
+        document.getElementById('online-cancel-btn')?.addEventListener('click', () => this.leaveOnline());
+        document.getElementById('room-cancel-btn')?.addEventListener('click', () => this.leaveOnline());
+        document.getElementById('room-start-btn')?.addEventListener('click', () => this.online.conn?.start());
         document.getElementById('abandon-btn')?.addEventListener('click', () => this.abandonMatch());
 
         // Thinking-depth slider (single-player PIMC K)
@@ -747,103 +751,248 @@ class GameUI {
         this.game = g;
     }
 
-    startOnline() {
-        const nick = (document.getElementById('online-nick')?.value || '').trim() || 'Player';
-        this.mode = 'online';
-        this.matchRound = 0;
-        this.totalScores = [0, 0, 0];
-        this.roundScores = [];
-        document.getElementById('difficulty-select').classList.add('hidden');
-        this.showWaiting('Joining…', false);
-        OnlineNet.joinQueue(nick).then(res => {
-            this.online.playerId = res.playerId;
-            this.online.token = res.token;
-            this.online.gameId = null;
-            localStorage.setItem('we_online', JSON.stringify(
-                { playerId: res.playerId, token: res.token }));
-            if (res.gameId) {
-                this.enterOnlineGame(res.gameId);
-            } else {
-                this.showWaiting('Waiting for players…', true);
-                this.pollQueue();
-            }
-        }).catch(e => this.showWaiting('Error: ' + e.message, false));
+    // The nickname from the lobby input.
+    nickInput() {
+        return (document.getElementById('online-nick')?.value || '').trim() || 'Player';
     }
 
-    pollQueue() {
-        if (this.mode !== 'online' || this.online.gameId) return;
-        OnlineNet.queueStatus(this.online.playerId).then(s => {
-            if (this.online.gameId) return;
-            if (s.status === 'matched' && s.gameId) this.enterOnlineGame(s.gameId);
-            else setTimeout(() => this.pollQueue(), OnlineNet.POLL_INTERVAL_MS);
-        }).catch(() => setTimeout(() => this.pollQueue(), OnlineNet.POLL_INTERVAL_MS));
+    // ---- Quick match (auto-pair via the lobby party) ----
+    startQuickMatch() {
+        this.online.nick = this.nickInput();
+        this.mode = 'online';
+        document.getElementById('difficulty-select').classList.add('hidden');
+        this.showWaiting('Finding a match…', true);
+        this.online.lobby = Online.connectLobby(this.online.nick, {
+            onWaiting: (count) => {
+                document.getElementById('online-wait-text').textContent =
+                    `Waiting for players… (${count} ready)`;
+            },
+            onMatched: (roomId) => {
+                this.online.lobby?.close();
+                this.online.lobby = null;
+                this.enterOnlineGame(roomId);
+            },
+            onError: (msg) => this.showWaiting('Error: ' + msg, true),
+        });
     }
 
     fillWithAI() {
-        OnlineNet.fillWithAI(this.online.playerId, this.online.token)
-            .then(res => { if (res.gameId) this.enterOnlineGame(res.gameId); })
-            .catch(e => this.showWaiting('Error: ' + e.message, true));
+        this.online.lobby?.fill();
     }
 
-    enterOnlineGame(gameId) {
-        this.online.gameId = gameId;
-        this.online.version = -1;
-        this.online.lastMatchRound = 0;
+    // ---- Private room: create as host ----
+    createRoom() {
+        this.online.nick = this.nickInput();
+        this.mode = 'online';
+        const roomId = Online.makeRoomCode();
+        document.getElementById('difficulty-select').classList.add('hidden');
+        this.enterRoom(roomId);
+    }
+
+    // ---- Private room: join by code ----
+    joinRoom(code) {
+        this.online.nick = this.nickInput();
+        this.mode = 'online';
+        document.getElementById('difficulty-select').classList.add('hidden');
+        this.enterRoom(code);
+    }
+
+    // Connect to a game room while it is still in its lobby (pre-start) phase.
+    enterRoom(roomId) {
+        this.mode = 'online';
+        this.online.roomId = roomId;
+        this.connectGame(roomId);
+    }
+
+    // Connect to a game room that is already playing (matched / resume).
+    enterOnlineGame(roomId) {
+        this.mode = 'online';
+        this.online.roomId = roomId;
+        this.matchRound = 0;
+        this.totalScores = [0, 0, 0];
         this.roundScores = [];
-        localStorage.setItem('we_online', JSON.stringify(
-            { playerId: this.online.playerId, token: this.online.token, gameId }));
+        localStorage.setItem('we_online', JSON.stringify({ roomId, nick: this.online.nick }));
+        this.connectGame(roomId);
+    }
+
+    // Open the authoritative game socket and route its push messages.
+    connectGame(roomId) {
+        this.online.active = true;
+        this.online.version = -1;
+        this.online.lastTrickKey = undefined; // first view after (re)join — no reveal
+        this.online.revealUntil = 0;
+        this._pendingView = null;
+        this.online.conn = Online.connectGame(roomId, this.online.nick, {
+            onLobby: (p) => this.renderRoomLobby(p),
+            onView: (view) => this.applyView(view),
+            onThinking: (t) => this.showThinking(t),
+            onWarning: (msg) => this.showOnlineWarning(msg),
+            onEnded: () => this.onlineEnded(),
+            onError: (msg) => console.warn('online:', msg),
+        });
+    }
+
+    // Render the private-room lobby (seat config). Host can edit AI/Open seats
+    // and start; non-hosts just wait.
+    renderRoomLobby(p) {
+        this.online.isHost = !!p.youAreHost;
         this.hideWaiting();
+        document.getElementById('game-area').classList.add('hidden');
+        document.getElementById('difficulty-select').classList.add('hidden');
+        document.getElementById('online-room').classList.remove('hidden');
+        document.getElementById('room-code').textContent = p.roomId;
+        document.getElementById('room-start-btn').classList.toggle('hidden', !p.youAreHost);
+        document.getElementById('room-wait-note').classList.toggle('hidden', p.youAreHost);
+
+        // Seat-fill options: Open (wait for a human) or an AI model. Search depth
+        // K is a separate control (Instant=greedy, K=5, K=10 PIMC search).
+        const MODEL_OPTS = [
+            { value: 'open', label: 'Open (human)' },
+            { value: 'minty1', label: 'Minty' },
+            { value: 'kingston2', label: 'Kingston' },
+            { value: 'crusher1', label: 'Crusher' },
+        ];
+        const K_OPTS = [
+            { value: 1, label: 'Instant' },
+            { value: 5, label: 'K=5' },
+            { value: 10, label: 'K=10' },
+        ];
+        const mkSelect = (opts, cur) => {
+            const sel = document.createElement('select');
+            sel.className = 'difficulty-dropdown';
+            for (const o of opts) {
+                const opt = document.createElement('option');
+                opt.value = String(o.value); opt.textContent = o.label;
+                if (String(o.value) === String(cur)) opt.selected = true;
+                sel.appendChild(opt);
+            }
+            return sel;
+        };
+
+        const container = document.getElementById('room-seats');
+        container.innerHTML = '';
+        for (const s of p.seats) {
+            const row = document.createElement('div');
+            const mine = s.type === 'human' && s.seat === p.yourSeat;
+            row.className = 'seat-row' + (mine ? ' you' : '');
+            const label = document.createElement('span');
+            label.className = 'seat-label';
+            label.textContent = `Seat ${s.seat + 1}`;
+            row.appendChild(label);
+
+            if (s.type === 'human') {
+                const name = document.createElement('span');
+                name.className = 'seat-name';
+                name.textContent = mine ? `${s.nickname || 'You'} (you)` : (s.nickname || 'Player');
+                row.appendChild(name);
+            } else if (p.youAreHost) {
+                // Host picks the model and the search depth K for this seat.
+                const ctrls = document.createElement('div');
+                ctrls.className = 'seat-ctrls';
+                const curModel = s.type === 'open' ? 'open' : s.model;
+                const curK = s.type === 'open' ? 10 : s.pimc;
+                const modelSel = mkSelect(MODEL_OPTS, curModel);
+                const kSel = mkSelect(K_OPTS, curK);
+                kSel.classList.toggle('hidden', curModel === 'open'); // K is moot for Open
+                const push = () => {
+                    if (modelSel.value === 'open') {
+                        this.online.conn?.configSeat(s.seat, 'open');
+                    } else {
+                        this.online.conn?.configSeat(s.seat,
+                            { model: modelSel.value, pimc: parseInt(kSel.value) });
+                    }
+                };
+                modelSel.addEventListener('change', () => {
+                    kSel.classList.toggle('hidden', modelSel.value === 'open');
+                    push();
+                });
+                kSel.addEventListener('change', push);
+                ctrls.appendChild(modelSel);
+                ctrls.appendChild(kSel);
+                row.appendChild(ctrls);
+            } else {
+                const name = document.createElement('span');
+                name.className = 'seat-name';
+                name.textContent = s.type === 'open' ? 'Open…'
+                    : `AI · ${(s.nickname || s.model)}`;
+                row.appendChild(name);
+            }
+            container.appendChild(row);
+        }
+    }
+
+    submitOnlineMove(action) {
+        if (this.busy || !this.online.conn) return;
+        // Send to the authoritative server.
+        this.online.conn.move(action, this.online.version);
+
+        const trickWillComplete = this.game.phase === 'PLAYING' &&
+            this.game.currentTrick.length === 2 &&
+            action >= 16 && action <= 60;
+        this.busy = true; // lock until the authoritative view arrives
+        if (trickWillComplete) {
+            // Can't resolve a trick locally (opponents' cards are hidden); show our
+            // card and wait for the server's resolved view (drives the reveal).
+            this.showThirdCard(action - 16, this.humanPlayer);
+        } else {
+            // Optimistic: apply our own move locally and render immediately. The
+            // next authoritative view overwrites this. (Bidding seal-takes keep the
+            // turn; passes/plays/discards are exact for our own seat.)
+            try { this.game.step(action); this.render(); } catch (e) { /* server will correct */ }
+        }
+    }
+
+    submitUndo(color) {
+        if (this.busy || !this.online.conn) return;
+        this.online.conn.undo(color);
+        // Optimistic: reverse the seal locally so it pops back immediately; the
+        // authoritative view reconciles. Undo keeps our turn (no busy lock needed).
+        try { if (this.game.undoSeal(color)) this.render(); } catch (e) { /* server corrects */ }
+    }
+
+    applyView(view) {
+        if (typeof view.version === 'number' && view.version < this.online.version) return; // stale
+        // First authoritative view: leave any lobby/waiting screen and enter play.
+        if (!this.gameStarted || document.getElementById('game-area').classList.contains('hidden')) {
+            this.beginOnlinePlay();
+        }
+        // Always remember the freshest view; while a trick reveal is on screen we
+        // defer rendering it until the 2s window ends.
+        this._pendingView = view;
+        if (this.online.revealUntil && Date.now() < this.online.revealUntil) return;
+        this.renderView(view);
+    }
+
+    // Switch from lobby/waiting to the in-game board on the first view.
+    beginOnlinePlay() {
+        localStorage.setItem('we_online', JSON.stringify(
+            { roomId: this.online.roomId, nick: this.online.nick }));
+        this.hideWaiting();
+        document.getElementById('online-room').classList.add('hidden');
         document.getElementById('game-area').classList.remove('hidden');
         document.getElementById('game-over').classList.add('hidden');
         document.getElementById('abandon-btn')?.classList.remove('hidden');
         document.getElementById('score-btn')?.classList.remove('hidden');
         this.gameStarted = true;
         this.busy = true;
-        this.online.polling = true;
-        this.online.lastTrickKey = undefined; // set on first view; no reveal on (re)join
-        this.online.revealUntil = 0;
-        this._pendingView = null;
-        this.pollGame();
     }
 
-    pollGame() {
-        if (this.mode !== 'online' || !this.online.polling) return;
-        OnlineNet.getState(this.online.gameId, this.online.token, this.online.version)
-            .then(view => { if (view.changed !== false) this.applyView(view); })
-            .catch(e => {
-                if (/404|not found/i.test(e.message)) {
-                    this.online.polling = false;
-                    localStorage.removeItem('we_online');
-                    this.backToOnlineLobby();
-                }
-            })
-            .finally(() => {
-                if (this.online.polling) setTimeout(() => this.pollGame(), OnlineNet.POLL_INTERVAL_MS);
-            });
-    }
-
-    submitOnlineMove(action) {
-        if (this.busy) return;
-        this.busy = true; // lock until the move response arrives
-        OnlineNet.move(this.online.gameId, this.online.token, action)
-            .then(view => this.applyView(view))
-            .catch(e => { this.busy = false; console.warn('move rejected:', e.message); });
-    }
-
-    submitUndo(color) {
-        if (this.busy) return;
-        this.busy = true;
-        OnlineNet.undo(this.online.gameId, this.online.token, color)
-            .then(view => this.applyView(view))
-            .catch(e => { this.busy = false; console.warn('undo rejected:', e.message); });
-    }
-
-    applyView(view) {
-        // Always remember the freshest view; while a trick reveal is on screen we
-        // defer rendering it until the 2s window ends.
-        this._pendingView = view;
+    // Show a transient "X is thinking…" hint while the server searches an AI seat.
+    showThinking(t) {
         if (this.online.revealUntil && Date.now() < this.online.revealUntil) return;
-        this.renderView(view);
+        const el = document.getElementById('status-text');
+        if (el) el.textContent = `${t.nickname} is thinking…`;
+    }
+
+    // Server-side AI warning (e.g. PIMC sidecar unreachable). Make it impossible
+    // to miss: log it and show a persistent banner instead of silently degrading.
+    showOnlineWarning(msg) {
+        console.error('[online warning]', msg);
+        if (this._warned) return;
+        this._warned = true;
+        const el = document.getElementById('status-text');
+        if (el) el.textContent = '⚠ AI server unreachable — see console';
+        alert('AI move server problem:\n\n' + msg);
     }
 
     renderView(view) {
@@ -860,7 +1009,7 @@ class GameUI {
             const nameEl = document.getElementById(`opponent-${slot}-name`);
             const metaEl = document.getElementById(`opponent-${slot}-meta`);
             if (nameEl) nameEl.textContent = p.nickname;
-            if (metaEl) metaEl.textContent = p.type === 'ai' ? 'Crusher · K=10' : 'Player';
+            if (metaEl) metaEl.textContent = p.type === 'ai' ? 'AI' : 'Player';
         }
 
         // Completed-trick reveal: hold the just-finished 3-card trick on screen for
@@ -890,7 +1039,7 @@ class GameUI {
 
         this.busy = !view.yourTurn;
         this.render();
-        if (view.status === 'done') { this.online.polling = false; this.onlineMatchOver(); }
+        if (view.status === 'done') { this.online.active = false; this.onlineMatchOver(); }
     }
 
     // Show the completed trick's three cards for 2s, then render the latest view.
@@ -903,7 +1052,7 @@ class GameUI {
         clearTimeout(this._revealTimer);
         this._revealTimer = setTimeout(() => {
             this.online.revealUntil = 0;
-            if (this.mode === 'online' && this.online.polling !== false) {
+            if (this.mode === 'online' && this._pendingView) {
                 this.renderView(this._pendingView);
             }
         }, 2000);
@@ -923,30 +1072,43 @@ class GameUI {
         document.getElementById('online-wait').classList.add('hidden');
     }
 
+    // Tear down any online sockets and return to the main lobby.
     backToOnlineLobby() {
+        this.online.conn?.close();
+        this.online.lobby?.close();
         this.mode = 'local';
-        this.online = { playerId: null, token: null, gameId: null,
-                        version: -1, polling: false, lastMatchRound: 0 };
+        this.online = { conn: null, lobby: null, roomId: null, nick: 'Player',
+                        active: false, version: -1, lastTrickKey: undefined,
+                        revealUntil: 0, isHost: false };
         this.gameStarted = false;
         clearTimeout(this._revealTimer);
         this.hideWaiting();
+        document.getElementById('online-room').classList.add('hidden');
         document.getElementById('game-over').classList.add('hidden');
         this.showDifficultySelect();
     }
 
-    // End + delete the match for everyone. Other players' next poll 404s and
-    // they're returned to the lobby (handled in pollGame).
+    // Leave a queue / room before the match starts (Cancel / Leave buttons).
+    leaveOnline() {
+        localStorage.removeItem('we_online');
+        this.backToOnlineLobby();
+    }
+
+    // Server told us the match ended (abandoned by a player, or the room is gone).
+    onlineEnded() {
+        if (this.mode !== 'online') return;
+        localStorage.removeItem('we_online');
+        this.backToOnlineLobby();
+    }
+
+    // End the match for everyone (server deletes the room → others get `ended`).
     abandonMatch() {
-        if (this.mode !== 'online' || !this.online.gameId) return;
+        if (this.mode !== 'online' || !this.online.conn) return;
         if (!confirm('Abandon this match? It will end for all players.')) return;
-        const { gameId, token } = this.online;
-        this.online.polling = false;          // stop our polling immediately
-        OnlineNet.abandon(gameId, token)
-            .catch(e => console.warn('abandon:', e.message))
-            .finally(() => {
-                localStorage.removeItem('we_online');
-                this.backToOnlineLobby();
-            });
+        this.online.active = false;
+        this.online.conn.abandon();
+        localStorage.removeItem('we_online');
+        this.backToOnlineLobby();
     }
 
     onlineRoundSummary(scores) {

@@ -76,21 +76,39 @@
                 <input id="online-nick" class="online-nick" type="text" maxlength="20"
                        placeholder="Your nickname" autocomplete="off">
                 <button id="play-online-btn" class="btn online-btn">Find Match</button>
+                <button id="create-room-btn" class="btn online-btn">Create Room</button>
+                <div class="join-room-row">
+                    <input id="join-code" class="online-nick" type="text" maxlength="8"
+                           placeholder="Room code" autocomplete="off">
+                    <button id="join-room-btn" class="btn online-btn">Join</button>
+                </div>
             </div>
-            <div class="online-hint">Up to 3 players — fill empty seats with AI from the waiting room.</div>
+            <div class="online-hint">Find Match pairs you with players (fill empties with AI), or create a private room and pick who fills each seat.</div>
 
             <button id="lobby-rules-btn" class="lobby-rules-btn">Read the rules</button>
         </div>
     </div>
 
-    <!-- Online waiting room -->
+    <!-- Online waiting room (quick match) -->
     <div id="online-wait" class="screen hidden">
         <div class="lobby-card">
             <div class="spinner"></div>
             <h2 id="online-wait-text">Waiting for players…</h2>
             <div class="online-hint">Matches start automatically when 3 players are ready.</div>
-            <button id="fill-ai-btn" class="btn start-btn hidden">Fill with AI (Crusher · K=10)</button>
+            <button id="fill-ai-btn" class="btn start-btn hidden">Fill empty seats with AI</button>
             <button id="online-cancel-btn" class="lobby-rules-btn">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Private room: host configures each seat, friends join by code -->
+    <div id="online-room" class="screen hidden">
+        <div class="lobby-card">
+            <h2>Room <span id="room-code" class="room-code"></span></h2>
+            <div class="online-hint" id="room-hint">Share the code. Set each seat to a player or an AI, then start.</div>
+            <div id="room-seats" class="room-seats"></div>
+            <button id="room-start-btn" class="btn start-btn hidden">Start Match</button>
+            <div id="room-wait-note" class="online-hint hidden">Waiting for the host to start…</div>
+            <button id="room-cancel-btn" class="lobby-rules-btn">Leave room</button>
         </div>
     </div>
 
@@ -254,7 +272,11 @@
     </div>
 
     <!-- Scripts -->
+    <!-- PartyKit host for online multiplayer. Leave unset for local `partykit dev`
+         (127.0.0.1:1999); set to your deployed host in production. -->
+    <script>window.PARTYKIT_HOST = "arcanum.manuel-stammler200.workers.dev";</script>
     <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <script src="js/partysocket.min.js"></script>
     <script src="js/game.js"></script>
     <script src="js/ai.js"></script>
     <script src="js/pimc.js"></script>

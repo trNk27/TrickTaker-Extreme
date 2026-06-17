@@ -29,21 +29,41 @@ function serializeGameState(game) {
     };
 }
 
-// Returns an action index (0..66). Throws on network/server error so the caller
-// can fall back to a local greedy move.
-async function fetchPimcMove(game, seat, K = 10, model = 'crusher1', endpoint = '/api/pimc-move') {
-    const resp = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state: serializeGameState(game), seat, K, model }),
-    });
-    if (!resp.ok) {
-        const detail = await resp.text().catch(() => '');
-        throw new Error(`pimc-move HTTP ${resp.status} ${detail}`);
+// Where the PIMC sidecar lives. In production it's same-origin (/api/pimc-move
+// on Vercel). For local dev the static site is served by `partykit dev` (:1999),
+// which has no such route, so default to the local Python sidecar on :3000.
+// Override with window.PIMC_SIDECAR_URL.
+function pimcEndpoint() {
+    if (typeof window !== 'undefined' && window.PIMC_SIDECAR_URL) return window.PIMC_SIDECAR_URL;
+    if (typeof location !== 'undefined' && /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+        return 'http://127.0.0.1:3000/api/pimc-move';
     }
-    const data = await resp.json();
-    if (typeof data.action !== 'number') throw new Error('pimc-move: no action in response');
-    return data.action;
+    return '/api/pimc-move';
+}
+
+// Returns an action index (0..66). Throws on network/server error (incl. a hard
+// timeout) so the caller can fall back to a local greedy move instead of hanging.
+async function fetchPimcMove(game, seat, K = 10, model = 'crusher1', endpoint) {
+    endpoint = endpoint || pimcEndpoint();
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 20000);
+    try {
+        const resp = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state: serializeGameState(game), seat, K, model }),
+            signal: ctrl.signal,
+        });
+        if (!resp.ok) {
+            const detail = await resp.text().catch(() => '');
+            throw new Error(`pimc-move HTTP ${resp.status} ${detail}`);
+        }
+        const data = await resp.json();
+        if (typeof data.action !== 'number') throw new Error('pimc-move: no action in response');
+        return data.action;
+    } finally {
+        clearTimeout(timer);
+    }
 }
 
 if (typeof module !== 'undefined' && module.exports) {

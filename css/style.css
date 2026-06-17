@@ -1334,3 +1334,45 @@ html, body {
         radial-gradient(ellipse at 75% 90%, rgba(40, 120, 30, 0.10) 0%, transparent 50%),
         linear-gradient(180deg, var(--arc-bg-2) 0%, var(--arc-bg) 100%);
 }
+
+/* ------- Online: private rooms ------- */
+.join-room-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+.join-room-row .online-nick { flex: 1; }
+
+.room-code {
+    font-family: var(--arc-sans);
+    letter-spacing: 2px;
+    color: var(--arc-gold);
+    text-transform: uppercase;
+}
+
+.room-seats {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 18px 0;
+}
+.seat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--arc-line);
+    border-radius: 8px;
+    background: rgba(12, 24, 12, 0.5);
+}
+.seat-row .seat-label {
+    font-family: var(--arc-sans);
+    font-size: 0.8rem;
+    color: var(--arc-ink-mute);
+}
+.seat-row .seat-name { color: var(--arc-ink); }
+.seat-row.you .seat-name { color: var(--arc-gold); }
+.seat-row select.difficulty-dropdown { min-width: 150px; }
+.seat-ctrls { display: flex; gap: 8px; align-items: center; }
+.seat-ctrls select.difficulty-dropdown { min-width: 110px; }

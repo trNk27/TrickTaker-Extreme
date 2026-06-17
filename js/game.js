@@ -71,6 +71,10 @@ class ArcanumGame {
         // Log of the current player's bidding takes/steals this turn, so a seal
         // can be un-taken by clicking it (reversed back to pool / victim).
         this.bidLog = [];
+
+        // Last completed trick (for the multiplayer reveal + pimc_core contract).
+        // {winner, cards:[[seat,cardId],...]} or null. Set in _finalizeTrick.
+        this.lastCompletedTrick = null;
     }
 
     reset() {
@@ -102,6 +106,7 @@ class ArcanumGame {
         this.pendingLeadColor = null;
         this.pendingWinCard = null;
         this.bidLog = [];
+        this.lastCompletedTrick = null;
 
         return this.getState(this.currentPlayerIdx);
     }
@@ -255,6 +260,11 @@ class ArcanumGame {
     }
 
     _finalizeTrick(winnerIdx) {
+        // Capture the trick before clearing it, for the multiplayer reveal.
+        this.lastCompletedTrick = {
+            winner: winnerIdx,
+            cards: this.currentTrick.map(t => [t.playerIdx, t.card.id]),
+        };
         this.currentTrick = [];
         this.tricksPlayed++;
         this.phase = "PLAYING";

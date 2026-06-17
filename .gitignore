@@ -6,3 +6,14 @@ __pycache__/
 .env.local
 .vercel/
 tmp/
+
+# PartyKit / Cloudflare / Node
+node_modules/
+.partykit/
+.wrangler/
+party/.trace.jsonl
+party/*.bundle.mjs
+
+# Retired Neon backend — kept on disk for reference, never deployed (its .py
+# files import psycopg and would break the Vercel Python build if committed).
+api/_retired_neon/

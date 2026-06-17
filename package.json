@@ -1,0 +1,25 @@
+{
+  "name": "arcanum-party",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Arcanum online multiplayer — Cloudflare Workers (partyserver) game + lobby Durable Objects (authoritative), Python PIMC sidecar for AI seats.",
+  "scripts": {
+    "dev": "wrangler dev --port 1999",
+    "site": "python3 -m http.server 8080",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "sidecar": "python party/_localsidecar.py",
+    "test:contract": "esbuild party/contract.emit.mjs --bundle --format=esm --platform=node --loader:.ts=ts --outfile=party/.contract.bundle.mjs && node party/.contract.bundle.mjs > party/.trace.jsonl && rm -f party/.contract.bundle.mjs && python party/contract_check.py < party/.trace.jsonl && rm -f party/.trace.jsonl",
+    "e2e": "node party/e2e.driver.mjs"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260617.1",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.3",
+    "wrangler": "^4.101.0"
+  },
+  "dependencies": {
+    "partyserver": "^0.5.8",
+    "partysocket": "^1.0.2"
+  }
+}

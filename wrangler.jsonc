@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "arcanum",
+  "main": "party/server.ts",
+  "compatibility_date": "2024-11-01",
+  "durable_objects": {
+    "bindings": [
+      { "name": "Game", "class_name": "Game" },
+      { "name": "Lobby", "class_name": "Lobby" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["Game", "Lobby"] }
+  ],
+  "vars": {
+    "PIMC_SIDECAR_URL": "https://trick-taker-extreme.vercel.app/api/pimc-move"
+  },
+  "observability": { "enabled": true }
+}

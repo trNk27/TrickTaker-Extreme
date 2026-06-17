@@ -1197,13 +1197,33 @@ body::before {
     transition: background 0.2s;
 }
 .hud-btn:hover { background: rgba(87, 224, 36, 0.14); }
-/* group the HUD buttons to the right, status fills the middle */
-.game-header { gap: 10px; }
-.game-header .status { flex: 1 1 auto; justify-content: center; }
+.hud-actions { display: flex; align-items: center; gap: 10px; }
 .rules-btn { border-radius: 0; }
 .abandon-btn { border-radius: 0; font-family: 'Silkscreen', sans-serif; }
-#status-text { font-family: 'VT323', monospace; font-size: 18px; letter-spacing: 0.02em; }
-.status-dot { box-shadow: 0 0 8px var(--arc-gold); }
+.game-header { margin-bottom: 10px; }
+
+/* Status on its own fixed-height row beneath the top bar, so changing its text
+   (e.g. "Thinking…" vs a long turn string) never wraps and never shifts the
+   layout below it. */
+.status-bar {
+    position: relative; z-index: 2;
+    display: flex; justify-content: center; align-items: center;
+    min-height: 34px; margin: 0 0 14px;
+}
+.status {
+    display: inline-flex; align-items: center; gap: 9px;
+    max-width: calc(100% - 20px);
+    padding: 5px 14px; white-space: nowrap;
+    background: linear-gradient(180deg, rgba(12,24,12,.92), rgba(7,14,7,.96));
+    border: 1px solid var(--arc-gold-2);
+    box-shadow: 0 0 14px rgba(87,224,36,.22), inset 0 0 12px rgba(87,224,36,.08);
+}
+#status-text {
+    font-family: 'VT323', monospace; font-size: 18px; letter-spacing: 0.02em;
+    text-transform: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.status-dot { flex: 0 0 auto; box-shadow: 0 0 8px var(--arc-gold); }
+@media (max-width: 380px) { #status-text { font-size: 15px; } }
 
 /* ---- Opponent name plates ---- */
 .opponent-name { font-family: 'Silkscreen', sans-serif; font-weight: 700; font-size: 12px; color: #cfe8b8; letter-spacing: 0.04em; }

@@ -98,14 +98,20 @@
                 <div class="brand-rune">✦</div>
                 <span class="brand-name">Arcanum</span>
             </div>
+            <div class="hud-actions">
+                <button id="score-btn" class="hud-btn hidden">Score</button>
+                <button id="abandon-btn" class="abandon-btn hidden">Abandon</button>
+                <button id="rules-btn" class="rules-btn" aria-label="Open rules">?</button>
+            </div>
+        </header>
+
+        <!-- Status sits on its own fixed-height row so length changes never shift the layout -->
+        <div class="status-bar">
             <div id="status" class="status">
                 <span class="status-dot"></span>
                 <span id="status-text">Bidding · Trick 1/15 · Your turn</span>
             </div>
-            <button id="score-btn" class="hud-btn hidden">Score</button>
-            <button id="abandon-btn" class="abandon-btn hidden">Abandon</button>
-            <button id="rules-btn" class="rules-btn" aria-label="Open rules">?</button>
-        </header>
+        </div>
 
         <div class="game-grid">
             <main class="game-main">

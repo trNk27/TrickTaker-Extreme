@@ -1,2 +1,8 @@
 __pycache__/
 *.pyc
+
+# Local dev secrets / artifacts — never commit
+.env
+.env.local
+.vercel/
+tmp/

@@ -322,6 +322,12 @@ class GameUI {
             for (let i = 0; i < count; i++) {
                 const seal = document.createElement('div');
                 seal.className = `seal seal-color-${c}`;
+                // Deterministic per-(colour,index) jitter so the pile looks
+                // playful but doesn't reshuffle when a seal is taken.
+                const h = ((c + 1) * 2654435761 + (i + 1) * 40503) >>> 0;
+                seal.style.setProperty('--rot', ((h >>> 3) % 45 - 22) + 'deg');
+                seal.style.setProperty('--dx', ((h >>> 9) % 13 - 6) + 'px');
+                seal.style.setProperty('--dy', ((h >>> 15) % 15 - 7) + 'px');
                 if (interactive && legal[c]) {
                     seal.classList.add('seal-clickable');
                     seal.title = 'Take';

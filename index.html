@@ -138,6 +138,12 @@
                     <div id="pool-seals" class="pool"></div>
                 </div>
 
+                <!-- Pass sits between the table and your hand; takes/steals/undo
+                     are done by clicking seals on the table. -->
+                <div id="pass-bar" class="pass-bar hidden">
+                    <button id="pass-btn" class="pass-btn">Pass</button>
+                </div>
+
                 <div class="player-area">
                     <div class="player-header">
                         <div class="player-name">Your hand</div>
@@ -145,40 +151,6 @@
                     </div>
                     <div id="player-hand"></div>
                     <div id="player-seals"></div>
-
-                    <div id="bid-buttons" class="action-panel hidden">
-                        <div class="action-label">Choose a seal — or pass</div>
-                        <div class="action-row">
-                            <button class="bid-btn" data-action="0">Red</button>
-                            <button class="bid-btn" data-action="1">Blue</button>
-                            <button class="bid-btn" data-action="2">Yellow</button>
-                            <button class="bid-btn" data-action="3">Green</button>
-                            <button class="bid-btn" data-action="4">Purple</button>
-                            <button class="bid-btn pass" data-action="5">Pass</button>
-                        </div>
-                    </div>
-
-                    <div id="steal-buttons" class="action-panel hidden">
-                        <div class="action-label">Steal — pool is empty</div>
-                        <div class="steal-grid">
-                            <div class="steal-col">
-                                <div class="steal-col-label">From AI 1</div>
-                                <button class="steal-btn" data-action="6">Red</button>
-                                <button class="steal-btn" data-action="8">Blue</button>
-                                <button class="steal-btn" data-action="10">Yellow</button>
-                                <button class="steal-btn" data-action="12">Green</button>
-                                <button class="steal-btn" data-action="14">Purple</button>
-                            </div>
-                            <div class="steal-col">
-                                <div class="steal-col-label">From AI 2</div>
-                                <button class="steal-btn" data-action="7">Red</button>
-                                <button class="steal-btn" data-action="9">Blue</button>
-                                <button class="steal-btn" data-action="11">Yellow</button>
-                                <button class="steal-btn" data-action="13">Green</button>
-                                <button class="steal-btn" data-action="15">Purple</button>
-                            </div>
-                        </div>
-                    </div>
 
                     <div id="discard-buttons" class="action-panel hidden">
                         <div class="action-label">You won — choose a seal to discard</div>

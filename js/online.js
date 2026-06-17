@@ -41,5 +41,7 @@ const OnlineNet = (() => {
         move: (gameId, token, action) => post('/api/game-move', { gameId, token, action }),
         // -> {ok:true}; ends + deletes the match for everyone
         abandon: (gameId, token) => post('/api/game-abandon', { gameId, token }),
+        // -> updated view; undo one bidding take/steal of `color`
+        undo: (gameId, token, color) => post('/api/game-undo', { gameId, token, color }),
     };
 })();

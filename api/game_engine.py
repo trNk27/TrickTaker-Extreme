@@ -96,6 +96,10 @@ class ArcanumGame:
         # {"cards": [[seat, cardId] x3], "winner": seat}. Server-only; PIMC ignores it.
         self.last_completed_trick = None
 
+        # Current player's bidding takes/steals this turn, so a seal can be
+        # un-taken (undo). Reset each bidding turn; carried in the state blob.
+        self.bid_log = []
+
     def reset(self):
         cards = []
         for c in range(NUM_COLORS):
@@ -118,7 +122,8 @@ class ArcanumGame:
         
         self.pending_trick_winner = None
         self.pending_trick_result_type = None
-        
+        self.bid_log = []
+
         return self.get_state(self.current_player_idx)
 
     def step(self, action):
@@ -144,6 +149,7 @@ class ArcanumGame:
                         penalty = REWARD_OVERBID_STEP * (n - BID_SOFT_CAP)
                         reward = penalty
                         info['permanent_rewards'][self.current_player_idx] = penalty
+                    self.bid_log.append({'type': 'take', 'color': int(action)})
             elif action == 5: # Pass
                 player.has_passed_bidding = True
                 self._advance_bidding_turn()
@@ -163,9 +169,13 @@ class ArcanumGame:
                     player.seals[color] += 1
                     player.initial_seals[color] += 1 # Count as initial bid? Rules unclear, assume yes for tracking logic
                     # Victim gets Joker (if pool has remaining)
+                    joker_given = False
                     if self.joker_pool > 0:
                         target_player.joker_seals += 1
                         self.joker_pool -= 1
+                        joker_given = True
+                    self.bid_log.append({'type': 'steal', 'color': int(color),
+                                         'victim': int(target_abs), 'joker': joker_given})
             
         elif self.phase == "PLAYING":
             if 16 <= action <= 60:
@@ -328,7 +338,33 @@ class ArcanumGame:
         p.black_seals += 1
         return REWARD_BLACK_SEAL
 
+    def undo_bid(self, p_idx, color):
+        """Reverse one bidding take/steal of `color` for player p_idx (undo)."""
+        if self.phase != "BIDDING" or self.current_player_idx != p_idx:
+            return False
+        p = self.players[p_idx]
+        for i in range(len(self.bid_log) - 1, -1, -1):
+            e = self.bid_log[i]
+            if e['color'] != color:
+                continue
+            if e['type'] == 'take':
+                self.pool_seals[color] += 1
+                p.seals[color] -= 1
+                p.initial_seals[color] -= 1
+            else:  # steal
+                victim = self.players[e['victim']]
+                victim.seals[color] += 1
+                p.seals[color] -= 1
+                p.initial_seals[color] -= 1
+                if e.get('joker'):
+                    victim.joker_seals -= 1
+                    self.joker_pool += 1
+            del self.bid_log[i]
+            return True
+        return False
+
     def _advance_bidding_turn(self):
+        self.bid_log = []  # next player's bidding turn starts fresh
         if all(p.has_passed_bidding for p in self.players):
             self.phase = "PLAYING"
             self.current_player_idx = self.starting_player_offset % NUM_PLAYERS

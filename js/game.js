@@ -67,6 +67,10 @@ class ArcanumGame {
         this.pendingTrickWinner = null;
         this.pendingLeadColor = null;
         this.pendingWinCard = null;
+
+        // Log of the current player's bidding takes/steals this turn, so a seal
+        // can be un-taken by clicking it (reversed back to pool / victim).
+        this.bidLog = [];
     }
 
     reset() {
@@ -97,6 +101,7 @@ class ArcanumGame {
         this.pendingTrickWinner = null;
         this.pendingLeadColor = null;
         this.pendingWinCard = null;
+        this.bidLog = [];
 
         return this.getState(this.currentPlayerIdx);
     }
@@ -121,6 +126,7 @@ class ArcanumGame {
                     this.poolSeals[action]--;
                     player.seals[action]++;
                     player.initialSeals[action]++;
+                    this.bidLog.push({ type: 'take', color: action });
                 }
             } else if (action === 5) {
                 // Pass
@@ -139,10 +145,13 @@ class ArcanumGame {
                     player.seals[color]++;
                     player.initialSeals[color]++;
                     // Victim gets Joker (if pool has remaining)
+                    let jokerGiven = false;
                     if (this.jokerPool > 0) {
                         targetPlayer.jokerSeals++;
                         this.jokerPool--;
+                        jokerGiven = true;
                     }
+                    this.bidLog.push({ type: 'steal', color, victim: targetAbs, joker: jokerGiven });
                 }
             }
         } else if (this.phase === "PLAYING") {
@@ -298,7 +307,31 @@ class ArcanumGame {
         return -3.0;
     }
 
+    // Reverse one bidding take/steal of `color` for the current player (undo).
+    undoSeal(color) {
+        if (this.phase !== "BIDDING") return false;
+        const p = this.players[this.currentPlayerIdx];
+        for (let i = this.bidLog.length - 1; i >= 0; i--) {
+            const e = this.bidLog[i];
+            if (e.color !== color) continue;
+            if (e.type === 'take') {
+                this.poolSeals[color]++;
+                p.seals[color]--;
+                p.initialSeals[color]--;
+            } else { // steal
+                this.players[e.victim].seals[color]++;
+                p.seals[color]--;
+                p.initialSeals[color]--;
+                if (e.joker) { this.players[e.victim].jokerSeals--; this.jokerPool++; }
+            }
+            this.bidLog.splice(i, 1);
+            return true;
+        }
+        return false;
+    }
+
     _advanceBiddingTurn() {
+        this.bidLog = []; // next player's bidding turn starts fresh
         if (this.players.every(p => p.hasPassedBidding)) {
             this.phase = "PLAYING";
             this.currentPlayerIdx = this.startingPlayerOffset % NUM_PLAYERS;

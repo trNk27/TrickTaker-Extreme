@@ -113,6 +113,31 @@ def apply_move(game_id, token, action):
             round_scores=result["round_scores"])
 
 
+def undo_seal(game_id, token, color):
+    """Reverse one of the caller's bidding takes/steals (undo). Stays in the
+    caller's bidding turn -- no AI advance, no round transition."""
+    with tx() as cur:
+        cur.execute("SELECT * FROM games WHERE id = %s FOR UPDATE", (game_id,))
+        row = cur.fetchone()
+        if not row:
+            raise MoveError(404, "game not found")
+        seat = _seat_for_token(row["seats"], _player_id_for_token(token))
+        if seat is None:
+            raise MoveError(403, "not a player in this game")
+        if row["status"] != "playing":
+            raise MoveError(409, "game is over")
+        game = pimc_core.deserialize(row["state"])
+        if game.phase != "BIDDING" or game.current_player_idx != seat:
+            raise MoveError(409, "not your bid to undo")
+        if not game.undo_bid(seat, int(color)):
+            raise MoveError(400, "nothing to undo for that color")
+        _persist(cur, row["id"], game, row["seats"], "playing",
+                 row["total_scores"], row["match_round"], None)
+        return game_session.build_view(
+            game, row["seats"], row["total_scores"], row["match_round"],
+            "playing", row["version"] + 1, seat)
+
+
 def maybe_timeout(game_id):
     """If the current human seat has been idle past the timeout, auto-play it.
 

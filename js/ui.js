@@ -94,12 +94,8 @@ class GameUI {
         document.getElementById('score-close')?.addEventListener('click', () => scoreModal.classList.add('hidden'));
         scoreModal?.addEventListener('click', (e) => { if (e.target === scoreModal) scoreModal.classList.add('hidden'); });
 
-        document.querySelectorAll('.bid-btn').forEach(btn => {
-            btn.addEventListener('click', () => this.handleBid(parseInt(btn.dataset.action)));
-        });
-        document.querySelectorAll('.steal-btn').forEach(btn => {
-            btn.addEventListener('click', () => this.handleBid(parseInt(btn.dataset.action)));
-        });
+        // Bidding takes/steals/undo are seal clicks (see render*); Pass is a button.
+        document.getElementById('pass-btn')?.addEventListener('click', () => this.handleBid(5));
         document.querySelectorAll('.discard-btn').forEach(btn => {
             btn.addEventListener('click', () => this.handleDiscard(parseInt(btn.dataset.action)));
         });
@@ -282,9 +278,23 @@ class GameUI {
         }
     }
 
+    // Is it the human's live bidding turn (so seals are interactive)?
+    isHumanBidding() {
+        return this.game.phase === 'BIDDING' &&
+            this.game.currentPlayerIdx === this.humanPlayer &&
+            !this.game.players[this.humanPlayer].hasPassedBidding;
+    }
+
     renderTrick() {
         const container = document.getElementById('trick-area');
         container.innerHTML = '<div class="trick-glow"></div>';
+
+        // During bidding the cauldron centre holds the pool (click to take);
+        // once play starts it holds the trick cards instead.
+        if (this.game.phase === 'BIDDING') {
+            this.renderPoolCenter(container);
+            return;
+        }
 
         for (const { playerIdx, card } of this.game.currentTrick) {
             const relPos = (playerIdx - this.humanPlayer + 3) % 3; // you at the bottom
@@ -295,45 +305,46 @@ class GameUI {
         }
     }
 
-    renderBidding() {
-        const bidContainer = document.getElementById('bid-buttons');
-        const stealContainer = document.getElementById('steal-buttons');
-
-        const isHumanBidding = this.game.phase === 'BIDDING' &&
-            this.game.currentPlayerIdx === this.humanPlayer &&
-            !this.game.players[this.humanPlayer].hasPassedBidding;
-
-        if (isHumanBidding) {
-            const legalMask = this.game.getLegalActions(this.humanPlayer);
-
-            // Show bid panel if any take/pass action is legal
-            const anyBidLegal = legalMask.slice(0, 6).some(x => x);
-            // Show steal panel if any steal action is legal
-            const anyStealLegal = legalMask.slice(6, 16).some(x => x);
-
-            if (anyBidLegal) {
-                bidContainer.classList.remove('hidden');
-                document.querySelectorAll('.bid-btn').forEach(btn => {
-                    const action = parseInt(btn.dataset.action);
-                    btn.disabled = !legalMask[action];
-                });
-            } else {
-                bidContainer.classList.add('hidden');
+    // The pool of available seals, grouped by colour, in the centre of the table.
+    // Clickable to take (action = colour) on the human's bidding turn.
+    renderPoolCenter(container) {
+        const interactive = this.isHumanBidding();
+        const legal = interactive ? this.game.getLegalActions(this.humanPlayer) : null;
+        const wrap = document.createElement('div');
+        wrap.className = 'pool-center';
+        let any = false;
+        for (let c = 0; c < 5; c++) {
+            const count = this.game.poolSeals[c];
+            if (count <= 0) continue;
+            any = true;
+            const group = document.createElement('div');
+            group.className = 'seal-group';
+            for (let i = 0; i < count; i++) {
+                const seal = document.createElement('div');
+                seal.className = `seal seal-color-${c}`;
+                if (interactive && legal[c]) {
+                    seal.classList.add('seal-clickable');
+                    seal.title = 'Take';
+                    seal.addEventListener('click', () => this.handleBid(c));
+                }
+                group.appendChild(seal);
             }
-
-            if (anyStealLegal) {
-                stealContainer.classList.remove('hidden');
-                document.querySelectorAll('.steal-btn').forEach(btn => {
-                    const action = parseInt(btn.dataset.action);
-                    btn.disabled = !legalMask[action];
-                });
-            } else {
-                stealContainer.classList.add('hidden');
-            }
-        } else {
-            bidContainer.classList.add('hidden');
-            stealContainer.classList.add('hidden');
+            wrap.appendChild(group);
         }
+        if (any) {
+            const label = document.createElement('div');
+            label.className = 'pool-center-label';
+            label.textContent = interactive ? 'Tap a seal to bid' : 'Pool';
+            container.appendChild(label);
+        }
+        container.appendChild(wrap);
+    }
+
+    renderBidding() {
+        // Bidding is now done by clicking seals (pool = take, opponent = steal,
+        // your own = undo). Only the standalone Pass bar is toggled here.
+        const passBar = document.getElementById('pass-bar');
+        if (passBar) passBar.classList.toggle('hidden', !this.isHumanBidding());
     }
 
     renderDiscard() {
@@ -354,34 +365,15 @@ class GameUI {
     }
 
     renderSeals() {
-        // Pool seals — only during bidding
-        const poolContainer = document.getElementById('pool-seals');
-        if (this.game.phase === 'BIDDING') {
-            poolContainer.classList.remove('hidden');
-            poolContainer.innerHTML = '<div class="pool-label">Pool</div>';
+        // The pool now lives in the centre of the table (renderPoolCenter).
+        document.getElementById('pool-seals')?.classList.add('hidden');
 
-            const sealsContainer = document.createElement('div');
-            sealsContainer.className = 'seals-container';
+        const interactive = this.isHumanBidding();
+        const legal = interactive ? this.game.getLegalActions(this.humanPlayer) : null;
 
-            for (let c = 0; c < 5; c++) {
-                const count = this.game.poolSeals[c];
-                if (count > 0) {
-                    const group = document.createElement('div');
-                    group.className = 'seal-group';
-                    for (let i = 0; i < count; i++) {
-                        const seal = document.createElement('div');
-                        seal.className = `seal seal-color-${c}`;
-                        group.appendChild(seal);
-                    }
-                    sealsContainer.appendChild(group);
-                }
-            }
-            poolContainer.appendChild(sealsContainer);
-        } else {
-            poolContainer.classList.add('hidden');
-        }
-
-        // Player + opponent seals (relative to your seat)
+        // Player + opponent seals (relative to your seat). During your bid:
+        //  - your own colour seals are clickable to UNDO a take/steal,
+        //  - an opponent's seal is clickable to STEAL it (when its pool is empty).
         for (let pIdx = 0; pIdx < 3; pIdx++) {
             const player = this.game.players[pIdx];
             const slot = (pIdx - this.humanPlayer + 3) % 3; // 0 = you, 1/2 = opponents
@@ -389,15 +381,26 @@ class GameUI {
             const container = document.getElementById(containerId);
             if (!container) continue;
             container.innerHTML = '';
+            const isYou = slot === 0;
 
             for (let c = 0; c < 5; c++) {
                 const count = player.seals[c];
                 if (count > 0) {
                     const group = document.createElement('div');
                     group.className = 'seal-group';
+                    const stealAction = 6 + c * 2 + (slot - 1); // for opponents
                     for (let i = 0; i < count; i++) {
                         const seal = document.createElement('div');
                         seal.className = `seal seal-color-${c}`;
+                        if (interactive && isYou) {
+                            seal.classList.add('seal-clickable', 'seal-undo');
+                            seal.title = 'Undo';
+                            seal.addEventListener('click', () => this.handleUndo(c));
+                        } else if (interactive && !isYou && legal[stealAction]) {
+                            seal.classList.add('seal-clickable', 'seal-steal');
+                            seal.title = 'Steal';
+                            seal.addEventListener('click', () => this.handleBid(stealAction));
+                        }
                         group.appendChild(seal);
                     }
                     container.appendChild(group);
@@ -527,6 +530,14 @@ class GameUI {
         const legalMask = this.game.getLegalActions(this.humanPlayer);
         if (!legalMask[action]) return;
         this.playAction(action);
+    }
+
+    // Click your own seal during your bid to put it back (undo a take/steal).
+    handleUndo(color) {
+        if (this.busy) return;
+        if (!this.isHumanBidding()) return;
+        if (this.mode === 'online') { this.submitUndo(color); return; }
+        if (this.game.undoSeal(color)) this.render();
     }
 
     handleDiscard(action) {
@@ -817,6 +828,14 @@ class GameUI {
         OnlineNet.move(this.online.gameId, this.online.token, action)
             .then(view => this.applyView(view))
             .catch(e => { this.busy = false; console.warn('move rejected:', e.message); });
+    }
+
+    submitUndo(color) {
+        if (this.busy) return;
+        this.busy = true;
+        OnlineNet.undo(this.online.gameId, this.online.token, color)
+            .then(view => this.applyView(view))
+            .catch(e => { this.busy = false; console.warn('undo rejected:', e.message); });
     }
 
     applyView(view) {

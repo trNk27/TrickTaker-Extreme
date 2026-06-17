@@ -24,11 +24,9 @@
                 <div class="opponent-select">
                     <div class="opponent-label">AI 1</div>
                     <select id="ai1-difficulty" class="difficulty-dropdown">
-                        <option value="casio2" selected>Casio2</option>
-                        <option value="minty1">Minty1</option>
-                        <option value="crusher1">Crusher1</option>
-                        <option value="crusher1-pimc5">Crusher1 · PIMC K=5</option>
-                        <option value="crusher1-pimc10">Crusher1 · PIMC K=10</option>
+                        <option value="minty1" selected>Minty1 - Easy</option>
+                        <option value="kingston2">Kingston2 - Medium</option>
+                        <option value="crusher1">Crusher1 - Hard</option>
                     </select>
                 </div>
                 <div class="vs-label">vs</div>
@@ -40,14 +38,22 @@
                 <div class="opponent-select">
                     <div class="opponent-label">AI 2</div>
                     <select id="ai2-difficulty" class="difficulty-dropdown">
-                        <option value="casio2">Casio2</option>
-                        <option value="minty1">Minty1</option>
-                        <option value="crusher1" selected>Crusher1</option>
-                        <option value="crusher1-pimc5">Crusher1 · PIMC K=5</option>
-                        <option value="crusher1-pimc10">Crusher1 · PIMC K=10</option>
+                        <option value="minty1">Minty1 - Easy</option>
+                        <option value="kingston2">Kingston2 - Medium</option>
+                        <option value="crusher1" selected>Crusher1 - Hard</option>
                     </select>
                 </div>
             </div>
+            <div class="thinking-control">
+                <div class="thinking-head">
+                    <span class="thinking-title">Thinking depth</span>
+                    <span class="thinking-val" id="thinking-val">Instant</span>
+                </div>
+                <input id="thinking-slider" type="range" min="0" max="10" step="5" value="0">
+                <div class="thinking-ticks"><span>Instant</span><span>K=5</span><span>K=10</span></div>
+                <div class="thinking-note">Deeper search (PIMC) makes the AI stronger but slower. Single-player only.</div>
+            </div>
+
             <button id="start-game-btn" class="btn start-btn">Start Game</button>
 
             <div class="lobby-divider"><span>or play online</span></div>

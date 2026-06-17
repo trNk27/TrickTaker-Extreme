@@ -1,6 +1,9 @@
 // Wizard Extreme UI Controller — Arcane direction
 // Renders into the new index.html markup. Game logic untouched.
 
+// The three selectable opponents and their difficulty labels.
+const MODEL_DIFFICULTY = { minty1: 'Easy', kingston2: 'Medium', crusher1: 'Hard' };
+
 class GameUI {
     constructor() {
         this.game = new WizardExtremeGame();
@@ -11,8 +14,10 @@ class GameUI {
         this.matchRound = 0;
         this.totalScores = [0, 0, 0];
         this.roundScores = []; // array of [s0,s1,s2] per completed round
-        this.ai1Difficulty = 'casio2';
+        this.ai1Difficulty = 'minty1';
         this.ai2Difficulty = 'crusher1';
+        // Single-player "Thinking depth" slider -> PIMC K (0 = greedy/instant, 5, 10).
+        this.thinkingK = 0;
 
         // Render methods are relative to humanPlayer + playerLabels so the same
         // code serves local play (you = seat 0) and online play (you = any seat).
@@ -76,6 +81,13 @@ class GameUI {
         });
         document.getElementById('abandon-btn')?.addEventListener('click', () => this.abandonMatch());
 
+        // Thinking-depth slider (single-player PIMC K)
+        const thinking = document.getElementById('thinking-slider');
+        thinking?.addEventListener('input', () => {
+            const k = parseInt(thinking.value);
+            document.getElementById('thinking-val').textContent = k === 0 ? 'Instant' : `K=${k}`;
+        });
+
         document.querySelectorAll('.bid-btn').forEach(btn => {
             btn.addEventListener('click', () => this.handleBid(parseInt(btn.dataset.action)));
         });
@@ -112,9 +124,10 @@ class GameUI {
     }
 
     displayName(difficulty) {
-        const { model, pimc } = this.parseDifficulty(difficulty);
+        const { model } = this.parseDifficulty(difficulty);
         const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
-        return pimc !== null ? `${cap(model)} · PIMC K=${pimc}` : cap(model);
+        const diff = MODEL_DIFFICULTY[model];
+        return diff ? `${cap(model)} · ${diff}` : cap(model);
     }
 
     async startMatch() {
@@ -122,6 +135,7 @@ class GameUI {
         this.busy = true;
         this.ai1Difficulty = document.getElementById('ai1-difficulty').value;
         this.ai2Difficulty = document.getElementById('ai2-difficulty').value;
+        this.thinkingK = parseInt(document.getElementById('thinking-slider')?.value || '0');
 
         document.getElementById('difficulty-select').classList.add('hidden');
         document.getElementById('loading').classList.remove('hidden');
@@ -563,7 +577,8 @@ class GameUI {
 
         const aiIndex = currentPlayer - 1;
         const difficulty = aiIndex === 0 ? this.ai1Difficulty : this.ai2Difficulty;
-        const { model, pimc } = this.parseDifficulty(difficulty);
+        const model = this.parseDifficulty(difficulty).model;
+        const pimc = this.thinkingK > 0 ? this.thinkingK : null; // global thinking-depth slider
 
         let action;
         if (pimc !== null) {

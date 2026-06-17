@@ -1,4 +1,4 @@
-// Wizard Extreme Game Engine - JavaScript Port
+// Arcanum Game Engine - JavaScript Port
 // Ported from Python game_engine.py (v2 - with Joker Seals and Decision Step)
 
 const NUM_PLAYERS = 3;
@@ -51,7 +51,7 @@ class Player {
     }
 }
 
-class WizardExtremeGame {
+class ArcanumGame {
     constructor() {
         this.players = [new Player(0), new Player(1), new Player(2)];
         this.roundHistoryMask = new Array(TOTAL_CARDS).fill(0);
@@ -484,5 +484,5 @@ class WizardExtremeGame {
 
 // Export for use in other modules
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { WizardExtremeGame, Card, Player, NUM_PLAYERS, NUM_COLORS, COLOR_NAMES, TOTAL_CARDS, ACTION_SPACE_SIZE, STATE_DIM };
+    module.exports = { ArcanumGame, Card, Player, NUM_PLAYERS, NUM_COLORS, COLOR_NAMES, TOTAL_CARDS, ACTION_SPACE_SIZE, STATE_DIM };
 }

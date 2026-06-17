@@ -1,11 +1,11 @@
-/* Wizard Extreme — Arcane direction
+/* Arcanum — Arcane direction
    Drop-in replacement for the original style.css.
    Uses EB Garamond (Google Fonts) loaded from index.html. */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-    /* Pixel-art "cauldron chamber" theme (design handoff: Wizard Extreme.dc.html).
+    /* Pixel-art "cauldron chamber" theme (design handoff: Arcanum.dc.html).
        Toxic-green / grime palette replacing the old gold theme; the --arc-*
        names are kept so the whole UI re-skins from these variables. */
     --arc-bg: #0a130c;
@@ -1145,7 +1145,7 @@ body::before {
 }
 
 /* =================================================================
-   PIXEL-ART CAULDRON THEME — design handoff (Wizard Extreme.dc.html)
+   PIXEL-ART CAULDRON THEME — design handoff (Arcanum.dc.html)
    Overrides below win by source order. Applies the cauldron-chamber
    skin to the game screen and carries the palette to the lobby.
    ================================================================= */

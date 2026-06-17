@@ -74,7 +74,7 @@ class Player:
         self.has_passed_bidding = False
         self.played_cards_mask.fill(0)
 
-class WizardExtremeGame:
+class ArcanumGame:
     def __init__(self):
         self.players = [Player(i) for i in range(NUM_PLAYERS)]
         self.round_history_mask = np.zeros(TOTAL_CARDS, dtype=int)

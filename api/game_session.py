@@ -15,7 +15,7 @@ import random
 import numpy as np
 
 import pimc_core
-from game_engine import WizardExtremeGame, TRICKS_PER_ROUND, COLOR_NAMES
+from game_engine import ArcanumGame, TRICKS_PER_ROUND, COLOR_NAMES
 
 MATCH_ROUNDS = 3        # best-of-3, mirrors the single-player client
 _LOOP_CAP = 4000        # safety against a runaway AI loop
@@ -24,7 +24,7 @@ _LOOP_CAP = 4000        # safety against a runaway AI loop
 # ----------------------------------------------------------------- round setup
 def new_round_state(match_round):
     """Fresh dealt round; starting player rotates by round like single-player."""
-    g = WizardExtremeGame()
+    g = ArcanumGame()
     g.starting_player_offset = match_round % 3
     g.reset()
     return g

@@ -1,4 +1,4 @@
-// Wizard Extreme — online multiplayer network client.
+// Arcanum — online multiplayer network client.
 // Thin fetch wrappers around the Vercel serverless endpoints. The server is
 // authoritative; the browser only submits the local player's actions and polls
 // for the redacted ego-centric view. See webapp/api/ for the backend.

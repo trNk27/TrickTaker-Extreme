@@ -1,10 +1,10 @@
-// Wizard Extreme AI - ONNX Model Interface
+// Arcanum AI - ONNX Model Interface
 // Handles model loading and inference for 373-dim state, 67 actions
 
 const STATE_DIM_AI = 373;
 const ACTION_DIM_AI = 67;
 
-class WizardAI {
+class ArcanumAI {
     constructor() {
         this.session = null;
         this.difficulty = 'minty1';
@@ -134,5 +134,5 @@ class WizardAI {
 
 // Export
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { WizardAI };
+    module.exports = { ArcanumAI };
 }

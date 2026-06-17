@@ -1,4 +1,4 @@
-// Wizard Extreme UI Controller — Arcane direction
+// Arcanum UI Controller — Arcane direction
 // Renders into the new index.html markup. Game logic untouched.
 
 // The three selectable opponents and their difficulty labels.
@@ -6,8 +6,8 @@ const MODEL_DIFFICULTY = { minty1: 'Easy', kingston2: 'Medium', crusher1: 'Hard'
 
 class GameUI {
     constructor() {
-        this.game = new WizardExtremeGame();
-        this.ai = [new WizardAI(), new WizardAI()];
+        this.game = new ArcanumGame();
+        this.ai = [new ArcanumAI(), new ArcanumAI()];
         this.humanPlayer = 0;
         this.gameStarted = false;
 
@@ -699,12 +699,12 @@ class GameUI {
 
     // ===================== Online multiplayer =====================
 
-    // Build a client-side WizardExtremeGame view-model from the server's redacted
+    // Build a client-side ArcanumGame view-model from the server's redacted
     // view. Only your own hand is known; opponents are placeholder cards of the
     // right count (rendered face-down). getLegalActions(you) is exact because it
     // depends only on your hand + public state.
     hydrateGame(view) {
-        const g = new WizardExtremeGame();
+        const g = new ArcanumGame();
         g.phase = view.phase;
         g.tricksPlayed = view.tricksPlayed;
         g.currentPlayerIdx = view.currentSeat;

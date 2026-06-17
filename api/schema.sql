@@ -1,4 +1,4 @@
--- Wizard Extreme online multiplayer schema (Neon Postgres).
+-- Arcanum online multiplayer schema (Neon Postgres).
 -- Apply once:  psql "$DATABASE_URL" -f api/schema.sql
 -- gen_random_uuid() is built in on Neon (pg14+).
 

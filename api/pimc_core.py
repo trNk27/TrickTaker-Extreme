@@ -32,7 +32,7 @@ import random
 import numpy as np
 import onnxruntime as ort
 
-from game_engine import (WizardExtremeGame, Card, NUM_PLAYERS, TOTAL_CARDS,
+from game_engine import (ArcanumGame, Card, NUM_PLAYERS, TOTAL_CARDS,
                          CARDS_PER_COLOR, ACTION_SPACE_SIZE)
 
 _SESSIONS = {}
@@ -56,7 +56,7 @@ def card_from_id(cid):
 
 # ---------------------------------------------------------------- serialization
 def deserialize(st):
-    g = WizardExtremeGame()
+    g = ArcanumGame()
     g.phase = st["phase"]
     g.tricks_played = int(st["tricksPlayed"])
     g.starting_player_offset = int(st["startingPlayerOffset"])
@@ -145,6 +145,8 @@ def rollout(session, clone):
 def relative_score(scores, p):
     """Margin of player p over the average of the other players.
 
+    CURRENTLY NOT IN USE
+
     The game is won by ordinal standing (closest to 0 of three), not by absolute
     penalty, so the search optimises own-minus-mean rather than own score alone.
     This keeps p ahead and -- crucially -- punishes letting an opponent escape
@@ -169,7 +171,7 @@ def pimc_action(session, game, p, K):
         for a in legal_plays:
             c = copy.deepcopy(w)
             c.step(a)
-            values[a] += relative_score(rollout(session, c), p)
+            values[a] += rollout(session, c)[p]
     return max(legal_plays, key=lambda a: values[a])
 
 

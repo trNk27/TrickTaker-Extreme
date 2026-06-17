@@ -6,7 +6,7 @@
     <title>Wizard Extreme</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&family=Press+Start+2P&family=Silkscreen:wght@400;700&family=VT323&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <link rel="icon" type="image/x-icon" href="favicon.ico">
 </head>
@@ -87,6 +87,12 @@
 
     <!-- Game -->
     <div id="game-area" class="screen hidden">
+        <!-- Cauldron-chamber background art (pixel-art skin) -->
+        <div class="game-bg" aria-hidden="true">
+            <div class="game-bg-art"></div>
+            <div class="game-bg-vignette"></div>
+            <div class="game-bg-scan"></div>
+        </div>
         <header class="game-header">
             <div class="brand">
                 <div class="brand-rune">✦</div>
@@ -96,6 +102,7 @@
                 <span class="status-dot"></span>
                 <span id="status-text">Bidding · Trick 1/15 · Your turn</span>
             </div>
+            <button id="score-btn" class="hud-btn hidden">Score</button>
             <button id="abandon-btn" class="abandon-btn hidden">Abandon</button>
             <button id="rules-btn" class="rules-btn" aria-label="Open rules">?</button>
         </header>
@@ -180,28 +187,33 @@
                     </div>
                 </div>
             </main>
+        </div>
+    </div>
 
-            <aside class="side">
-                <div class="panel">
-                    <div class="panel-head">
-                        <div class="panel-title">Standings</div>
-                        <div class="panel-meta" id="round-indicator">Round 1 / 3</div>
-                    </div>
-                    <div id="standings"></div>
-                    <div class="round-track" id="round-track">
-                        <div class="round-pip current">R1</div>
-                        <div class="round-pip">R2</div>
-                        <div class="round-pip">R3</div>
-                    </div>
+    <!-- Score / standings (opened with the header "Score" button during play) -->
+    <div id="score-modal" class="modal-bg hidden">
+        <div class="modal score-modal">
+            <div class="modal-head">
+                <div>
+                    <div class="modal-title">Standings</div>
+                    <div class="modal-sub" id="round-indicator">Round 1 / 3</div>
                 </div>
-
-                <div class="panel">
-                    <div class="panel-head">
-                        <div class="panel-title">By round</div>
-                    </div>
-                    <div class="rounds-table" id="rounds-table"></div>
+                <button id="score-close" class="modal-close" aria-label="Close">×</button>
+            </div>
+            <div class="panel">
+                <div id="standings"></div>
+                <div class="round-track" id="round-track">
+                    <div class="round-pip current">R1</div>
+                    <div class="round-pip">R2</div>
+                    <div class="round-pip">R3</div>
                 </div>
-            </aside>
+            </div>
+            <div class="panel">
+                <div class="panel-head">
+                    <div class="panel-title">By round</div>
+                </div>
+                <div class="rounds-table" id="rounds-table"></div>
+            </div>
         </div>
     </div>
 

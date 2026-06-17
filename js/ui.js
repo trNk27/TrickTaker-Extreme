@@ -88,6 +88,12 @@ class GameUI {
             document.getElementById('thinking-val').textContent = k === 0 ? 'Instant' : `K=${k}`;
         });
 
+        // Score / standings modal (opened during play)
+        const scoreModal = document.getElementById('score-modal');
+        document.getElementById('score-btn')?.addEventListener('click', () => scoreModal.classList.remove('hidden'));
+        document.getElementById('score-close')?.addEventListener('click', () => scoreModal.classList.add('hidden'));
+        scoreModal?.addEventListener('click', (e) => { if (e.target === scoreModal) scoreModal.classList.add('hidden'); });
+
         document.querySelectorAll('.bid-btn').forEach(btn => {
             btn.addEventListener('click', () => this.handleBid(parseInt(btn.dataset.action)));
         });
@@ -155,6 +161,7 @@ class GameUI {
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('game-area').classList.remove('hidden');
         document.getElementById('game-over').classList.add('hidden');
+        document.getElementById('score-btn')?.classList.remove('hidden');
 
         // Set opponent labels
         document.getElementById('opponent-1-name').textContent = 'AI 1';
@@ -178,6 +185,8 @@ class GameUI {
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('game-over').classList.add('hidden');
         document.getElementById('abandon-btn')?.classList.add('hidden');
+        document.getElementById('score-btn')?.classList.add('hidden');
+        document.getElementById('score-modal')?.classList.add('hidden');
         this.gameStarted = false;
         this.busy = false;
         clearTimeout(this.nextTimer);
@@ -776,6 +785,7 @@ class GameUI {
         document.getElementById('game-area').classList.remove('hidden');
         document.getElementById('game-over').classList.add('hidden');
         document.getElementById('abandon-btn')?.classList.remove('hidden');
+        document.getElementById('score-btn')?.classList.remove('hidden');
         this.gameStarted = true;
         this.busy = true;
         this.online.polling = true;

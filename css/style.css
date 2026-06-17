@@ -1300,17 +1300,10 @@ body::before {
     font-family: 'Silkscreen', sans-serif; font-size: 9px; letter-spacing: 0.14em;
     text-transform: uppercase; color: var(--arc-ink-mute);
 }
-/* Big, playfully-scattered pool seals (jitter set per-seal via CSS vars in JS) */
-.pool-center .seal {
-    width: 30px; height: 30px;
-    transform: translate(var(--dx, 0), var(--dy, 0)) rotate(var(--rot, 0deg));
-}
-.pool-center .seal-group .seal { margin-left: -11px; }
-.pool-center .seal-group .seal:first-child { margin-left: 0; }
-.pool-center .seal-clickable:hover {
-    transform: translate(var(--dx, 0), calc(var(--dy, 0) - 7px)) rotate(var(--rot, 0deg)) scale(1.2);
-    z-index: 8; position: relative;
-}
+/* Big pool seals laid out in a clean row per colour (no overlap) */
+.pool-center .seal { width: 30px; height: 30px; }
+.pool-center .seal-group { gap: 5px; }
+.pool-center .seal-group .seal { margin-left: 0; }
 
 /* Clickable seals (take / steal / undo). The base .seal has pointer-events:none,
    so interactive seals must re-enable pointer events. */

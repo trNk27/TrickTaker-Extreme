@@ -18,7 +18,7 @@ export const COLOR_NAMES: any =
 
 export type Seat =
   | { type: "human"; playerId: string; nickname: string }
-  | { type: "ai"; model: string; pimc: number; nickname: string };
+  | { type: "ai"; model: string; pimc: number; bidK?: number; nickname: string };
 
 const C5 = [0, 1, 2, 3, 4];
 
@@ -193,14 +193,17 @@ export async function aiMove(
   g: any,
   seat: number,
   model: string,
-  pimcK: number
+  pimcK: number,
+  bidK: number = 0
 ): Promise<AiMoveResult> {
   const K = Math.max(1, pimcK || 1);
   try {
+    const body: any = { state: serializeGame(g), seat, K, model };
+    if (bidK && bidK > 0) body.bidK = bidK; // "smart bidding": PIMC the bid phase
     const resp = await fetch(sidecarUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ state: serializeGame(g), seat, K, model }),
+      body: JSON.stringify(body),
     });
     if (!resp.ok) {
       const body = await resp.text().catch(() => "");

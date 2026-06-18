@@ -43,9 +43,10 @@ sock.addEventListener("message", (ev) => {
       // Configure the two non-host seats (model/K overridable via env for timing).
       const model = process.env.AI_MODEL || "minty1";
       const pimc = parseInt(process.env.AI_K || "1");
+      const smartBid = process.env.AI_SMARTBID === "1"; // exercise bid-phase PIMC
       for (const s of m.seats) {
         if (s.seat !== m.yourSeat)
-          send({ type: "configSeat", seat: s.seat, value: { model, pimc } });
+          send({ type: "configSeat", seat: s.seat, value: { model, pimc, smartBid } });
       }
       started = true;
       setTimeout(() => send({ type: "start" }), 200);

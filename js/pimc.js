@@ -43,15 +43,19 @@ function pimcEndpoint() {
 
 // Returns an action index (0..66). Throws on network/server error (incl. a hard
 // timeout) so the caller can fall back to a local greedy move instead of hanging.
-async function fetchPimcMove(game, seat, K = 10, model = 'crusher1', endpoint) {
+// bidK: when set (>0), the server runs PIMC at that depth for the BIDDING phase
+// ("smart bidding"); null/0 leaves bids greedy. K still governs the PLAYING phase.
+async function fetchPimcMove(game, seat, K = 10, model = 'crusher1', bidK = null, endpoint) {
     endpoint = endpoint || pimcEndpoint();
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 20000);
     try {
+        const body = { state: serializeGameState(game), seat, K, model };
+        if (bidK) body.bidK = bidK;
         const resp = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ state: serializeGameState(game), seat, K, model }),
+            body: JSON.stringify(body),
             signal: ctrl.signal,
         });
         if (!resp.ok) {

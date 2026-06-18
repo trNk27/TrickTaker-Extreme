@@ -216,6 +216,22 @@ body::before {
     font-size: 12px;
     color: var(--arc-ink-faint);
 }
+.smart-bid-toggle {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--arc-ink-mute);
+    cursor: pointer;
+}
+.smart-bid-toggle input {
+    margin-top: 2px;
+    cursor: pointer;
+}
+.smart-bid-toggle small {
+    color: var(--arc-ink-faint);
+}
 
 .lobby-rules-btn {
     display: block;
@@ -1376,3 +1392,13 @@ html, body {
 .seat-row select.difficulty-dropdown { min-width: 150px; }
 .seat-ctrls { display: flex; gap: 8px; align-items: center; }
 .seat-ctrls select.difficulty-dropdown { min-width: 110px; }
+.seat-smartbid {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--arc-ink-mute);
+    white-space: nowrap;
+    cursor: pointer;
+}
+.seat-smartbid input { cursor: pointer; }

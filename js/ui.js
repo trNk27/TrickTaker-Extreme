@@ -4,6 +4,10 @@
 // The three selectable opponents and their difficulty labels.
 const MODEL_DIFFICULTY = { minty1: 'Easy', kingston2: 'Medium', crusher1: 'Hard' };
 
+// PIMC depth used for "smart bidding" (bid-phase search). Kept modest because a
+// bid turn fires one search per seal taken; tune here if it feels too slow.
+const SMART_BID_K = 5;
+
 class GameUI {
     constructor() {
         this.game = new ArcanumGame();
@@ -18,6 +22,9 @@ class GameUI {
         this.ai2Difficulty = 'crusher1';
         // Single-player "Thinking depth" slider -> PIMC K (0 = greedy/instant, 5, 10).
         this.thinkingK = 0;
+        // "Smart bidding": run PIMC for AI bids too (at SMART_BID_K), independent
+        // of the play-phase slider. 0 = off (greedy bids, the historical default).
+        this.smartBidK = 0;
 
         // Render methods are relative to humanPlayer + playerLabels so the same
         // code serves local play (you = seat 0) and online play (you = any seat).
@@ -142,6 +149,7 @@ class GameUI {
         this.ai1Difficulty = document.getElementById('ai1-difficulty').value;
         this.ai2Difficulty = document.getElementById('ai2-difficulty').value;
         this.thinkingK = parseInt(document.getElementById('thinking-slider')?.value || '0');
+        this.smartBidK = document.getElementById('smart-bid-check')?.checked ? SMART_BID_K : 0;
 
         document.getElementById('difficulty-select').classList.add('hidden');
         document.getElementById('loading').classList.remove('hidden');
@@ -602,13 +610,24 @@ class GameUI {
         const aiIndex = currentPlayer - 1;
         const difficulty = aiIndex === 0 ? this.ai1Difficulty : this.ai2Difficulty;
         const model = this.parseDifficulty(difficulty).model;
-        const pimc = this.thinkingK > 0 ? this.thinkingK : null; // global thinking-depth slider
+
+        // Decide whether this specific turn warrants a server PIMC search:
+        //  - PLAYING: when the thinking-depth slider is above Instant.
+        //  - BIDDING: when "smart bidding" is on (independent of the slider).
+        //  - DISCARDING: never — it's cheap and the server runs it greedy anyway.
+        const playK = this.thinkingK;            // 0 (Instant) / 5 / 10
+        const bidK = this.smartBidK;             // 0 (off) / SMART_BID_K
+        const phase = this.game.phase;
+        const useServer = (phase === 'PLAYING' && playK > 0) ||
+                          (phase === 'BIDDING' && bidK > 0);
 
         let action;
-        if (pimc !== null) {
+        if (useServer) {
             document.getElementById('status-text').textContent = 'Thinking…';
             try {
-                action = await fetchPimcMove(this.game, currentPlayer, pimc, model);
+                // K governs play; bidK governs bids. The server picks per phase, so
+                // passing both is safe regardless of which phase we're in.
+                action = await fetchPimcMove(this.game, currentPlayer, playK || 1, model, bidK || null);
             } catch (e) {
                 console.warn('PIMC fetch failed, falling back to greedy:', e);
                 const state = this.game.getState(currentPlayer);
@@ -886,7 +905,8 @@ class GameUI {
                 name.textContent = mine ? `${s.nickname || 'You'} (you)` : (s.nickname || 'Player');
                 row.appendChild(name);
             } else if (p.youAreHost) {
-                // Host picks the model and the search depth K for this seat.
+                // Host picks the model, the play-phase search depth K, and whether
+                // this seat uses "smart bidding" (bid-phase PIMC search).
                 const ctrls = document.createElement('div');
                 ctrls.className = 'seat-ctrls';
                 const curModel = s.type === 'open' ? 'open' : s.model;
@@ -894,21 +914,38 @@ class GameUI {
                 const modelSel = mkSelect(MODEL_OPTS, curModel);
                 const kSel = mkSelect(K_OPTS, curK);
                 kSel.classList.toggle('hidden', curModel === 'open'); // K is moot for Open
+
+                // Smart-bid toggle, sits right next to the K dropdown.
+                const bidLabel = document.createElement('label');
+                bidLabel.className = 'seat-smartbid';
+                bidLabel.title = 'AI searches its bids (PIMC) instead of guessing';
+                const bidChk = document.createElement('input');
+                bidChk.type = 'checkbox';
+                bidChk.checked = !!(s.bidK && s.bidK > 0);
+                bidLabel.appendChild(bidChk);
+                bidLabel.appendChild(document.createTextNode('Smart bid'));
+                bidLabel.classList.toggle('hidden', curModel === 'open'); // moot for Open
+
                 const push = () => {
                     if (modelSel.value === 'open') {
                         this.online.conn?.configSeat(s.seat, 'open');
                     } else {
                         this.online.conn?.configSeat(s.seat,
-                            { model: modelSel.value, pimc: parseInt(kSel.value) });
+                            { model: modelSel.value, pimc: parseInt(kSel.value),
+                              smartBid: bidChk.checked });
                     }
                 };
                 modelSel.addEventListener('change', () => {
-                    kSel.classList.toggle('hidden', modelSel.value === 'open');
+                    const open = modelSel.value === 'open';
+                    kSel.classList.toggle('hidden', open);
+                    bidLabel.classList.toggle('hidden', open);
                     push();
                 });
                 kSel.addEventListener('change', push);
+                bidChk.addEventListener('change', push);
                 ctrls.appendChild(modelSel);
                 ctrls.appendChild(kSel);
+                ctrls.appendChild(bidLabel);
                 row.appendChild(ctrls);
             } else {
                 const name = document.createElement('span');

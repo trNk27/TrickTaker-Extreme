@@ -35,8 +35,10 @@ class Handler(BaseHTTPRequestHandler):
             if model not in ALLOWED:
                 return self._send(400, {"error": f"unknown model '{model}'"})
             K = max(1, min(30, int(req.get("K", 10))))
-            action = pimc_core.choose(req["state"], int(req["seat"]), K, model)
-            self._send(200, {"action": action, "K": K, "model": model})
+            bid_k_raw = req.get("bidK")
+            bid_k = max(1, min(30, int(bid_k_raw))) if bid_k_raw else None
+            action = pimc_core.choose(req["state"], int(req["seat"]), K, model, bid_k)
+            self._send(200, {"action": action, "K": K, "model": model, "bidK": bid_k})
         except Exception as e:
             self._send(500, {"error": f"{type(e).__name__}: {e}"})
 

@@ -34,7 +34,10 @@ export interface Env {
 }
 
 const TURN_TIMEOUT_MS = 45_000; // idle human seat auto-played after this
-const DEFAULT_AI = { model: "crusher1", pimc: 10, nickname: "Crusher" };
+// PIMC depth for "smart bidding" (bid-phase search) when a seat enables it.
+// Modest on purpose: a bid turn fires one search per seal taken.
+const SMART_BID_K = 5;
+const DEFAULT_AI = { model: "crusher1", pimc: 10, bidK: 0, nickname: "Crusher" };
 
 type OpenSlot = { type: "open" };
 type SlotConfig = OpenSlot | Seat; // lobby-phase seat config (may contain "open")
@@ -62,12 +65,15 @@ const AI_MODELS: Record<string, string> = {
 };
 const ALLOWED_K = [1, 5, 10];
 
-// Build a validated AI seat from a {model, pimc} config, or null if invalid.
-function aiSeatFrom(model: string, pimc: number): Seat | null {
+// Build a validated AI seat from a {model, pimc, smartBid} config, or null if
+// invalid. smartBid (truthy) turns on bid-phase PIMC search at SMART_BID_K.
+function aiSeatFrom(model: string, pimc: number, smartBid: boolean): Seat | null {
   if (!AI_MODELS[model]) return null;
   const K = ALLOWED_K.includes(pimc) ? pimc : 10;
+  const bidK = smartBid ? SMART_BID_K : 0;
   const depth = K === 1 ? "greedy" : `K=${K}`;
-  return { type: "ai", model, pimc: K, nickname: `${AI_MODELS[model]} · ${depth}` };
+  const tag = bidK ? " · smart bid" : "";
+  return { type: "ai", model, pimc: K, bidK, nickname: `${AI_MODELS[model]} · ${depth}${tag}` };
 }
 
 export class Game extends Server<Env> {
@@ -189,7 +195,7 @@ export class Game extends Server<Env> {
     if (msg.value === "open") {
       s.config[seat] = { type: "open" };
     } else if (msg.value && typeof msg.value === "object") {
-      const seatCfg = aiSeatFrom(String(msg.value.model), msg.value.pimc | 0);
+      const seatCfg = aiSeatFrom(String(msg.value.model), msg.value.pimc | 0, !!msg.value.smartBid);
       if (!seatCfg) return;
       s.config[seat] = seatCfg;
     } else {
@@ -316,7 +322,7 @@ export class Game extends Server<Env> {
         model: cfg.model,
         pimc: cfg.pimc,
       });
-      const mv = await aiMove(this.sidecarUrl(), g, seat, cfg.model, cfg.pimc);
+      const mv = await aiMove(this.sidecarUrl(), g, seat, cfg.model, cfg.pimc, cfg.bidK ?? 0);
       if (!mv.ok) this.reportSidecarFailure(seat, cfg, mv.error);
       const res = g.step(mv.action);
       this.commitStep(g, res);
@@ -426,6 +432,7 @@ export class Game extends Server<Env> {
         nickname: (c as any).nickname ?? null,
         model: (c as any).model ?? null,
         pimc: (c as any).pimc ?? null,
+        bidK: (c as any).bidK ?? 0,
       })),
     };
   }

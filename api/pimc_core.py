@@ -160,25 +160,48 @@ def relative_score(scores, p):
     return scores[p] - sum(others) / len(others)
 
 
+# Per-phase action ranges the search ranks over. PLAYING = card plays (16-60),
+# BIDDING = take/pass/steal (0-15). DISCARDING (61-66) is never searched -- it
+# stays greedy -- so it is intentionally absent here.
+_PHASE_ACTIONS = {"PLAYING": range(16, 61), "BIDDING": range(0, 16)}
+
+
 def pimc_action(session, game, p, K):
-    mask = game.get_legal_actions(p)
-    legal_plays = [a for a in range(16, 61) if mask[a]]
-    if game.phase != "PLAYING":
+    """Rank the current phase's legal actions by averaged rollout value over K
+    determinized worlds. Works for both PLAYING (card plays) and BIDDING
+    (take/pass/steal): each candidate is applied once, then the world is rolled
+    out greedily to the round's terminal score. Falls back to greedy for any
+    phase without a search range (e.g. DISCARDING)."""
+    rng = _PHASE_ACTIONS.get(game.phase)
+    if rng is None:
         return onnx_greedy(session, game, p)
-    if len(legal_plays) <= 1:
-        return legal_plays[0]
+    mask = game.get_legal_actions(p)
+    cands = [a for a in rng if mask[a]]
+    if len(cands) <= 1:
+        return cands[0] if cands else onnx_greedy(session, game, p)
     worlds = [determinize(game, p) for _ in range(K)]
-    values = {a: 0.0 for a in legal_plays}
+    values = {a: 0.0 for a in cands}
     for w in worlds:
-        for a in legal_plays:
+        for a in cands:
             c = copy.deepcopy(w)
             c.step(a)
             values[a] += rollout(session, c)[p]
-    return max(legal_plays, key=lambda a: values[a])
+    return max(cands, key=lambda a: values[a])
 
 
-def choose(state, seat, K, model):
-    """Top-level entry: reconstruct, search, return action index."""
+def choose(state, seat, K, model, bid_k=None):
+    """Top-level entry: reconstruct, search, return action index.
+
+    K       = PIMC depth for the PLAYING phase (card plays).
+    bid_k   = PIMC depth for the BIDDING phase ("smart bidding"). When falsy,
+              bidding stays greedy (the historical behaviour). DISCARDING is
+              always greedy regardless of K/bid_k.
+    """
     game = deserialize(state)
     session = get_session(model)
-    return pimc_action(session, game, int(seat), int(K))
+    seat = int(seat)
+    if game.phase == "PLAYING":
+        return pimc_action(session, game, seat, int(K))
+    if game.phase == "BIDDING" and bid_k:
+        return pimc_action(session, game, seat, int(bid_k))
+    return onnx_greedy(session, game, seat)

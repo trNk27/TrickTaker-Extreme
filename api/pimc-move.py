@@ -51,7 +51,12 @@ class handler(BaseHTTPRequestHandler):
             if model not in ALLOWED_MODELS:
                 return self._send(400, {"error": f"unknown model '{model}'"})
 
-            action = pimc_core.choose(state, seat, K, model)
-            self._send(200, {"action": action, "K": K, "model": model})
+            # "Smart bidding": when bidK is present/positive, the bidding phase
+            # runs PIMC at that depth instead of greedy. Absent/<=0 = greedy bids.
+            bid_k_raw = req.get("bidK")
+            bid_k = max(1, min(MAX_K, int(bid_k_raw))) if bid_k_raw else None
+
+            action = pimc_core.choose(state, seat, K, model, bid_k)
+            self._send(200, {"action": action, "K": K, "model": model, "bidK": bid_k})
         except Exception as e:
             self._send(500, {"error": f"{type(e).__name__}: {e}"})

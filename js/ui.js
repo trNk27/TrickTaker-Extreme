@@ -875,6 +875,7 @@ class GameUI {
             { value: 1, label: 'Instant' },
             { value: 5, label: 'K=5' },
             { value: 10, label: 'K=10' },
+            { value: 20, label: 'K=20' },
         ];
         const mkSelect = (opts, cur) => {
             const sel = document.createElement('select');

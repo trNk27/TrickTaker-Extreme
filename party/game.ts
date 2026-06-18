@@ -63,7 +63,7 @@ const AI_MODELS: Record<string, string> = {
   kingston2: "Kingston",
   crusher1: "Crusher",
 };
-const ALLOWED_K = [1, 5, 10];
+const ALLOWED_K = [1, 5, 10, 20];
 
 // Build a validated AI seat from a {model, pimc, smartBid} config, or null if
 // invalid. smartBid (truthy) turns on bid-phase PIMC search at SMART_BID_K.

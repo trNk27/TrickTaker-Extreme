@@ -8,6 +8,11 @@ const MODEL_DIFFICULTY = { minty1: 'Easy', kingston2: 'Medium', crusher1: 'Hard'
 // bid turn fires one search per seal taken; tune here if it feels too slow.
 const SMART_BID_K = 5;
 
+// Seconds allotted per turn (single-player). When the human runs out, a sensible
+// legal move is auto-played so the game never stalls; AI turns resolve well
+// before this, so the ring just resets for them.
+const TURN_SECONDS = 30;
+
 class GameUI {
     constructor() {
         this.game = new ArcanumGame();
@@ -52,12 +57,73 @@ class GameUI {
         // which stepped a play action into the DISCARDING phase and produced a
         // spurious black seal.) Every schedule clears the previous one.
         this.nextTimer = null;
+
+        // Per-turn countdown ring. `turnTimerInterval` drives the visual (and the
+        // auto-move when the human runs out of time). Local single-player only.
+        this.turnTimerInterval = null;
+        this.turnTimerEnd = 0;
     }
 
     // Schedule the single next step, replacing any pending one (enforces one loop).
     scheduleNext(fn, delay) {
         clearTimeout(this.nextTimer);
         this.nextTimer = setTimeout(fn, delay);
+    }
+
+    // ---------- Per-turn countdown ring (local single-player) ----------
+
+    // (Re)start the 30s ring for whoever is on turn now. A single interval drives
+    // the SVG sweep, the seconds label, and the human auto-move on expiry.
+    startTurnTimer() {
+        if (this.mode !== 'local') return;
+        this.clearTurnTimer();
+
+        const wrap = document.getElementById('turn-timer');
+        const ring = document.getElementById('turn-timer-ring');
+        const label = document.getElementById('turn-timer-label');
+        if (!wrap || !ring) return;
+
+        const R = 16;                       // matches the <circle r> in index.html
+        const C = 2 * Math.PI * R;
+        ring.style.strokeDasharray = C.toFixed(2);
+
+        const duration = TURN_SECONDS * 1000;
+        this.turnTimerEnd = Date.now() + duration;
+        wrap.classList.remove('hidden');
+
+        const tick = () => {
+            const remaining = Math.max(0, this.turnTimerEnd - Date.now());
+            const frac = remaining / duration;          // 1 -> 0
+            ring.style.strokeDashoffset = (C * (1 - frac)).toFixed(2);
+            if (label) label.textContent = String(Math.ceil(remaining / 1000));
+            wrap.classList.toggle('urgent', remaining <= 5000);
+            if (remaining <= 0) {
+                this.clearTurnTimer();
+                this.onTurnTimeout();
+            }
+        };
+        tick();
+        this.turnTimerInterval = setInterval(tick, 50);
+    }
+
+    clearTurnTimer() {
+        if (this.turnTimerInterval) {
+            clearInterval(this.turnTimerInterval);
+            this.turnTimerInterval = null;
+        }
+        document.getElementById('turn-timer')?.classList.add('hidden');
+    }
+
+    // Human ran out of time: auto-play a sensible legal move so play never stalls.
+    onTurnTimeout() {
+        if (this.mode !== 'local' || !this.gameStarted || this.busy) return;
+        if (this.game.currentPlayerIdx !== this.humanPlayer) return;
+        const mask = this.game.getLegalActions(this.humanPlayer);
+        let action = -1;
+        // Prefer passing in bidding; otherwise take the first legal action.
+        if (this.game.phase === 'BIDDING' && mask[5]) action = 5;
+        else { for (let i = 0; i < mask.length; i++) if (mask[i]) { action = i; break; } }
+        if (action >= 0) this.playAction(action);
     }
 
     async init() {
@@ -198,6 +264,7 @@ class GameUI {
         this.gameStarted = false;
         this.busy = false;
         clearTimeout(this.nextTimer);
+        this.clearTurnTimer();
     }
 
     render() {
@@ -602,6 +669,7 @@ class GameUI {
     async processNextTurn() {
         if (!this.gameStarted) return;
         const currentPlayer = this.game.currentPlayerIdx;
+        this.startTurnTimer(); // fresh 30s ring for whoever is on turn
         if (currentPlayer === this.humanPlayer) {
             this.busy = false; // hand control back to the human
             return;
@@ -660,6 +728,7 @@ class GameUI {
         this.gameStarted = false;
         this.busy = false;
         clearTimeout(this.nextTimer);
+        this.clearTurnTimer();
         this.roundScores.push(scores);
         for (let i = 0; i < 3; i++) this.totalScores[i] += scores[i];
         this.matchRound++;
@@ -827,15 +896,18 @@ class GameUI {
     enterOnlineGame(roomId) {
         this.mode = 'online';
         this.online.roomId = roomId;
-        this.matchRound = 0;
-        this.totalScores = [0, 0, 0];
-        this.roundScores = [];
         localStorage.setItem('we_online', JSON.stringify({ roomId, nick: this.online.nick }));
         this.connectGame(roomId);
     }
 
     // Open the authoritative game socket and route its push messages.
     connectGame(roomId) {
+        // Fresh game: clear any score state from a previous match so the by-round
+        // table / standings don't bleed across rooms and lobbies. The server's
+        // first view re-seeds matchRound/totalScores; roundScores is client-built.
+        this.matchRound = 0;
+        this.totalScores = [0, 0, 0];
+        this.roundScores = [];
         this.online.active = true;
         this.online.version = -1;
         this.online.lastTrickKey = undefined; // first view after (re)join — no reveal
@@ -1050,10 +1122,22 @@ class GameUI {
             if (metaEl) metaEl.textContent = p.type === 'ai' ? 'AI' : 'Player';
         }
 
+        // Capture a finished round exactly once (a round can't complete twice
+        // between polls, so we never miss one). This runs BEFORE the trick-reveal
+        // early-return below: the server carries the finished round's scores on
+        // every view of the next round, and a next-round trick can re-trigger a
+        // reveal — if that swallowed this block, the score overview would be
+        // skipped and play would jump straight into the next round.
+        if (view.roundScores) {
+            const completed = view.status === 'done' ? 3 : view.matchRound;
+            if (this.roundScores.length < completed) {
+                this.roundScores.push(view.roundScores);
+                if (view.status !== 'done') this.onlineRoundSummary(view.roundScores);
+            }
+        }
+
         // Completed-trick reveal: hold the just-finished 3-card trick on screen for
-        // 2s before the next state clears it (matches single-player). A mid-round
-        // trick never coincides with a round-end view (roundScores), so these two
-        // paths don't collide.
+        // 2s before the next state clears it (matches single-player).
         const key = view.lastTrick ? `${view.matchRound}:${view.tricksPlayed}` : null;
         if (this.online.lastTrickKey === undefined) {
             this.online.lastTrickKey = key;            // first view after (re)join — no reveal
@@ -1063,16 +1147,6 @@ class GameUI {
             return;
         } else {
             this.online.lastTrickKey = key;
-        }
-
-        // Capture a finished round exactly once (a round can't complete twice
-        // between polls, so we never miss one).
-        if (view.roundScores) {
-            const completed = view.status === 'done' ? 3 : view.matchRound;
-            if (this.roundScores.length < completed) {
-                this.roundScores.push(view.roundScores);
-                if (view.status !== 'done') this.onlineRoundSummary(view.roundScores);
-            }
         }
 
         this.busy = !view.yourTurn;
@@ -1120,6 +1194,13 @@ class GameUI {
                         revealUntil: 0, isHost: false };
         this.gameStarted = false;
         clearTimeout(this._revealTimer);
+        // Clear the finished match's scores so the standings / by-round table
+        // don't persist into the lobby (and the next match's score modal).
+        this.matchRound = 0;
+        this.totalScores = [0, 0, 0];
+        this.roundScores = [];
+        this.playerLabels = ['You', 'AI 1', 'AI 2'];
+        this._pendingView = null;
         this.hideWaiting();
         document.getElementById('online-room').classList.add('hidden');
         document.getElementById('game-over').classList.add('hidden');

@@ -43,6 +43,8 @@
                         <option value="kingston2">Kingston2 - Medium</option>
                         <option value="crusher1">Crusher1 - Hard</option>
                         <option value="anker1">Anker1 - Expert</option>
+                        <option value="rubiks1">Rubiks1</option>
+                        <option value="ginger1">Ginger1</option>
                     </select>
                 </div>
                 <div class="vs-label">vs</div>
@@ -58,6 +60,8 @@
                         <option value="kingston2">Kingston2 - Medium</option>
                         <option value="crusher1">Crusher1 - Hard</option>
                         <option value="anker1" selected>Anker1 - Expert</option>
+                        <option value="rubiks1">Rubiks1</option>
+                        <option value="ginger1">Ginger1</option>
                     </select>
                 </div>
             </div>
@@ -149,6 +153,13 @@
             <div id="status" class="status">
                 <span class="status-dot"></span>
                 <span id="status-text">Bidding · Trick 1/15 · Your turn</span>
+            </div>
+            <div id="turn-timer" class="turn-timer hidden" aria-hidden="true" title="Time left this turn">
+                <svg class="turn-timer-svg" viewBox="0 0 36 36">
+                    <circle class="turn-timer-track" cx="18" cy="18" r="16"></circle>
+                    <circle id="turn-timer-ring" class="turn-timer-ring" cx="18" cy="18" r="16"></circle>
+                </svg>
+                <span id="turn-timer-label" class="turn-timer-label">30</span>
             </div>
         </div>
 

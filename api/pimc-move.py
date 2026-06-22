@@ -21,7 +21,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import pimc_core
 
-ALLOWED_MODELS = {"crusher1", "minty1", "kingston2"}
+ALLOWED_MODELS = {"crusher1", "minty1", "kingston2", "anker1", "rubiks1", "ginger1"}
 MAX_K = 30
 
 
